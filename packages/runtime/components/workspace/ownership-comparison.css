@@ -1,0 +1,56 @@
+.vp-ownership {
+  min-width: 0;
+  overflow-x: auto;
+}
+.vp-ownership:focus-visible {
+  outline: 2px solid var(--vp-accent);
+  outline-offset: 2px;
+}
+.vp-ownership table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: left;
+}
+.vp-ownership caption {
+  padding-bottom: 12px;
+  text-align: left;
+  color: var(--vp-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+.vp-ownership :is(th, td) {
+  padding: 10px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--vp-border);
+  overflow-wrap: anywhere;
+}
+.vp-ownership thead th {
+  color: var(--vp-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.vp-ownership tbody th {
+  font-weight: 550;
+}
+.vp-main .vp-ownership td code {
+  padding: 0;
+  border: 0;
+  background: none;
+  white-space: normal;
+  font-size: 12.5px;
+}
+.vp-ownership tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+.vp-ownership td ul {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+@media (max-width: 600px) {
+  .vp-ownership table {
+    min-width: 520px;
+  }
+}

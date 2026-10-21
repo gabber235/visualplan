@@ -144,31 +144,8 @@ the root AGENTS.md for why Vite is configured without `@vitejs/plugin-react`.
   validates its props through `validate.ts`
   against the matching zod schema in `@visualplan/core`, throwing a readable, component-named
   error on invalid input (this surfaces in the page and is the render-time half of validation).
-- **The data components (FileTree, Chart, Stat, Compare, Matrix, Questions, Checklist) are authored
-  as markdown children, not props.** The CLI's `remark-plan-blocks` plugin parses those children
-  into the structured data and passes it as a JSON string on the component's data prop
-  (`files`/`data`/`options`/`items`); the component calls `decodeJson` (in `validate.ts`) to
-  parse it before `validateProps`. `decodeJson` passes a non-string through unchanged, so the
-  component tests can still hand the value directly.
-- **Matrix** is a comparison grid authored as a GFM table (`<table className="vp-matrix">` in a
-  horizontal-scroll wrapper); a column header ending in `(pick)` highlights that column. **Chart**
-  is single- or multi-series: its data is `{ series, data: [{ label, values[] }] }`; one
-  `<Bar>`/`<Line>` per series, a `<Legend>` only when there is more than one, and the per-point
-  `<Cell>` coloring only for a single series. `Chart` dispatches on `type` across nine recharts
-  branches (`bar`, `line`, `area`, `scatter`, `radar`, `gauge`, `funnel`, `treemap`, `pie`);
-  `stacked` applies a shared `stackId` to the `<Bar>`/`<Area>` series. **Stat** renders a responsive
-  grid of metric cards (`.vp-stat__card` with `data-intent`), one per item, value + label + optional
-  caption; the intent tints reuse the `--vp-*-tint` vars. **FileTree** supports a directory-level change: a
-  path ending in `/` sets `change` on the `DirNode` and renders the marker on the directory row. A
-  `move` carries an optional `from` (origin) on the entry; the file renders at its destination with
-  a muted `MovedFrom` annotation (`← <from>`) so the rename is visible (the CLI parser requires the
-  `-> <to>` arrow and keeps `from`, rather than discarding the origin). Each entry also takes an
-  optional `comment` (an inline `- <change> <path> -- <note>` trailer, rendered muted) and an
-  optional `icon` (Material Icon Theme SVG markup). The `icon` is **never authored**: it is injected
-  at build time by the CLI's `remark-filetree-icons` pass and inlined via `dangerouslySetInnerHTML`
-  (trusted build-time dependency, not plan input). When `icon` is absent (the `/view` path, which
-  cannot resolve Material icons), `FileIcon` falls back to a generic Tabler `IconFile`; directories
-  keep their folder icon and are never given a file-type icon.
+- `components/workspace/` renders each decision as optional custom `Visual` explanations, code model comparisons, optional reasoning, examples, and remaining code changes. `Visual` children of `PlanWorkspace` keep their MDX; the compiler records each one's exact source on its decision (`visuals`), so it joins the decision snapshot and feedback targets. `RevisionChanges` compares the model with the revision this browser opened before the current one (IndexedDB `vp-revision:<path>` stores the current and previous snapshots, so agent renders the reader never opened cannot hide changes and a reload keeps the highlights). Without an earlier opened revision, `review-baseline.ts` rebuilds what the reader last reviewed from the saved review snapshots, so plans reviewed before revisions were kept still highlight; unmarked content counts as unchanged. Reasoning cards without ids pair by content first, because review snapshots store them sorted. `revision-diff.ts` diffs field by field using authored ids; changed text is tinted and shows a word diff on hover, changed code lines are tinted per hunk and show the lines they replaced, removed children are listed per decision, and decision and change tiles carry change markers. A summary line can hide the highlights (`localStorage` `vp-revision-highlights`). `DiffCues` leaves the workspace section to this. Status badges appear only for accepted, denied, or changed items; unreviewed is the silent default. Review buttons sit in the label row of each block. `role: "model"` reuses code contracts, highlighting slots, and review identities. Model entries do not repeat in the final change set. No implementation route renders. Optional explanatory fields produce no empty panels or redundant captions.
+- `WorkspaceReview` owns portable review marks, comments, and drafts in IndexedDB scoped by artifact path. Loading finishes before review interaction is enabled. Saves resolve after transaction commit; queued reads follow earlier writes across revision remounts. Existing local storage records are read only when no database record exists. Storage failures remain visible with retry and a complete review backup, and pending or failed saves guard against closing the page. Review snapshots invalidate changed approvals while preserving unchanged ones. Nested denials propagate and block acceptance; decision actions fill only unreviewed descendants. `feedback-targets.ts` reconciles comments against their complete semantic target content, including targets outside the visible decision. Changed or deleted targets lose saved comments permanently; unrelated edits and presentation reordering preserve them. Stale unsaved drafts remain recoverable and cannot silently be saved against new content. Export carries source and revision once, semantic targets, compact selected text, and verbatim comments. Comments carry no kind; older stored kinds are read and ignored. Copying the packet stamps comments with the exported revision, and loading a different revision drops them. `__VP_SOURCE__` supplies the original MDX file for file renders. Local snapshots and fingerprints stay out of export. Browser marks never authorize implementation. The server based `ReviewLayer` remains separate.
 
 ## Gotchas
 
@@ -263,6 +240,10 @@ page. The rules below are deliberate; changing them needs a reason.
   that real users never see. Non-chart content is unaffected by `fullPage`.
 
 ## Adding a component
+
+Workspace review snapshots distinguish decision meaning and membership from child code content. Child edits invalidate their own marks and propagate a changed indicator. Decision meaning or membership changes need a new decision mark; accepting the last open child of a changed decision supplies it. Each example is one review item covering usage and result. Automatic acceptance saves an unmarked comparison baseline so later decision changes remain detectable. Optional reasoning serializes as an empty string, and the reader repairs older reasoning fields missing that string.
+
+Workspace ownership comparisons use optional decision `ownership` rows, with stable row and cell feedback anchors. Code removals use `change: "delete"` plus current code without a replacement, or a complete file deletion diff. The removal disclosure keeps review controls visible. Mixed edits keep their full comparison. Both remain inside the existing decision and review system.
 
 1. Add its zod schema, enum constants, and a `CATALOG` entry (with `staticEnums` and an
    example) to `@visualplan/core` (`packages/core/src/index.ts`).

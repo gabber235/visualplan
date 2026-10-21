@@ -1,0 +1,222 @@
+.vp-reviewable-code {
+  min-width: 0;
+  border: 1px solid var(--vp-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.vp-reviewable-code[data-status="accepted"] {
+  border-color: var(--vp-tip-border);
+}
+.vp-reviewable-code[data-status="denied"] {
+  border-color: var(--vp-risk-border);
+}
+.vp-item-review {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 8px 6px 14px;
+  background: var(--vp-surface);
+}
+.vp-item-review__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.vp-item-review__label {
+  color: var(--vp-muted);
+  font-size: 12px;
+}
+.vp-item-review[data-status="accepted"] .vp-item-review__label {
+  color: var(--vp-done);
+}
+.vp-item-review[data-status="denied"] .vp-item-review__label {
+  color: var(--vp-risk);
+}
+.vp-item-review__controls {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+.vp-workspace .vp-item-review__controls button {
+  padding: 3px 10px;
+  border: 1px solid var(--vp-border);
+  border-radius: 5px;
+  color: var(--vp-text);
+  background: var(--vp-bg);
+  font-size: 13px;
+  min-height: 28px;
+}
+.vp-item-review__controls button[aria-pressed="true"][data-action="accept"] {
+  border-color: var(--vp-done);
+  background: var(--vp-tip-tint);
+}
+.vp-item-review__controls button[aria-pressed="true"][data-action="deny"] {
+  border-color: var(--vp-risk);
+  background: var(--vp-risk-tint);
+}
+.vp-item-review__changes {
+  min-width: 0;
+  margin-top: 8px;
+}
+.vp-item-review__changes summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.vp-item-review__changes section {
+  margin: 12px 0;
+  min-width: 0;
+}
+.vp-main .vp-item-review__changes pre {
+  max-width: 100%;
+  overflow-x: auto;
+  font: 12.5px / 1.65 var(--vp-mono);
+}
+.vp-item-review__changes :is(del, ins) {
+  white-space: pre;
+}
+.vp-item-review__changes del {
+  background: var(--vp-risk-tint);
+}
+.vp-item-review__changes ins {
+  background: var(--vp-tip-tint);
+  text-decoration: none;
+}
+.vp-review-progress {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0 8px;
+}
+.vp-review-progress__track {
+  height: 3px;
+  background: var(--vp-border);
+}
+.vp-review-progress__track > span {
+  display: block;
+  height: 100%;
+  background: var(--vp-done);
+}
+.vp-main .vp-review-progress p {
+  margin: 0;
+  color: var(--vp-muted);
+  font-size: 13px;
+}
+@media (max-width: 700px) {
+  .vp-workspace .vp-item-review__controls button,
+  .vp-item-review__changes summary {
+    min-height: 44px;
+  }
+}
+@media print {
+  .vp-item-review {
+    display: none;
+  }
+}
+
+.vp-workspace__review-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.vp-workspace .vp-review-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid var(--vp-border);
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vp-muted);
+  background: var(--vp-bg);
+}
+.vp-workspace .vp-review-status[data-status="accepted"] {
+  color: var(--vp-done);
+  border-color: var(--vp-tip-border);
+  background: var(--vp-tip-tint);
+}
+.vp-workspace .vp-review-status[data-status="denied"] {
+  color: var(--vp-risk);
+  border-color: var(--vp-risk-border);
+  background: var(--vp-risk-tint);
+}
+.vp-workspace .vp-review-status[data-status="unreviewed"][data-invalidated="true"] {
+  color: var(--vp-warn);
+  border-color: var(--vp-warn-border);
+  background: var(--vp-warn-tint);
+}
+.vp-workspace
+  :is(
+    .vp-workspace__mast,
+    .vp-workspace__surface,
+    .vp-code-contract,
+    .vp-developer-experience__example,
+    .vp-workspace__decisions button,
+    .vp-code-contract__index button
+  )[data-status="denied"] {
+  border-color: var(--vp-risk-border);
+  box-shadow: none;
+}
+.vp-decision-workbench[data-status="denied"] {
+  border-color: var(--vp-risk-border);
+}
+.vp-main .vp-workspace .vp-item-review__blocked {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--vp-risk-border);
+  border-radius: 5px;
+  font-size: 14px;
+  color: var(--vp-risk);
+  background: var(--vp-risk-tint);
+}
+.vp-reviewable-code > .vp-item-review {
+  border-bottom: 1px solid var(--vp-border);
+}
+.vp-item-review__controls button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.vp-code-contract__index .vp-review-status {
+  justify-self: start;
+}
+
+@media (max-width: 700px) {
+  .vp-code-contract > header {
+    flex-wrap: wrap;
+  }
+}
+
+.vp-code-contract__index .vp-review-status {
+  font-size: 12px;
+  padding: 1px 6px;
+}
+.vp-code-contract__diff > section > .vp-reviewable-code,
+.vp-code-contract__unified > .vp-reviewable-code {
+  border: 0;
+  border-radius: 0;
+}
+.vp-decision-workbench > header > .vp-item-review {
+  display: contents;
+}
+.vp-decision-workbench > header > .vp-item-review > .vp-item-review__bar {
+  grid-column: 2;
+  grid-row: 1;
+}
+.vp-decision-workbench > header > .vp-item-review > :is(p, details) {
+  grid-column: 1 / -1;
+}
+@media print {
+  .vp-decision-workbench > header > .vp-item-review {
+    display: none;
+  }
+}

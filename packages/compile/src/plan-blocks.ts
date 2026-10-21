@@ -1,4 +1,4 @@
-import { CHANGE_VALUES, STAT_INTENT_VALUES } from '@visualplan/core'
+import { CHANGE_VALUES, planWorkspaceSchema, STAT_INTENT_VALUES } from '@visualplan/core'
 
 /**
  * Parses the markdown-list children of the list-shaped plan components into the
@@ -20,6 +20,7 @@ export const CHILD_BLOCK_COMPONENTS = [
   'Compare',
   'Matrix',
   'Stat',
+  'PlanWorkspace',
 ] as const
 
 /** The prop each block component receives its parsed data on (a JSON string at render). */
@@ -31,6 +32,7 @@ export const BLOCK_DATA_ATTR: Record<string, string> = {
   Compare: 'options',
   Matrix: 'data',
   Stat: 'items',
+  PlanWorkspace: 'model',
 }
 
 export interface BlockIssue {
@@ -52,12 +54,16 @@ interface MdAttribute {
 
 interface MdNode {
   type: string
+  name?: string | null
   value?: string
   depth?: number
   checked?: boolean | null
   children?: MdNode[]
   attributes?: MdAttribute[]
-  position?: { start: { line: number; column: number } }
+  position?: {
+    start: { line: number; column: number; offset?: number }
+    end?: { offset?: number }
+  }
 }
 
 const CHANGES: readonly string[] = CHANGE_VALUES
@@ -79,6 +85,10 @@ function firstList(node: MdNode): MdNode | undefined {
 
 function firstTable(node: MdNode): MdNode | undefined {
   return (node.children ?? []).find(child => child.type === 'table')
+}
+
+function firstCode(node: MdNode): MdNode | undefined {
+  return (node.children ?? []).find(child => child.type === 'code')
 }
 
 /** Read a string-literal JSX attribute (e.g. Chart's `type`) off the element node. */
@@ -437,7 +447,110 @@ function parseStat(node: MdNode): BlockResult {
   return { value: items, issues }
 }
 
-const PARSERS: Record<string, (node: MdNode) => BlockResult> = {
+interface WorkspaceVisual {
+  decision: string
+  id: string
+  title: string
+  source: string
+}
+
+/** Strip positions so a visual without source text still has a stable content snapshot. */
+function positionless(node: MdNode): unknown {
+  const { position: _position, children, ...rest } = node
+  return children ? { ...rest, children: children.map(positionless) } : rest
+}
+
+/** Collect `<Visual>` children; their source text lets review detect a changed explanation. */
+export function workspaceVisuals(
+  node: MdNode,
+  source?: string,
+): { visuals: WorkspaceVisual[]; issues: BlockIssue[] } {
+  const visuals: WorkspaceVisual[] = []
+  const issues: BlockIssue[] = []
+  for (const child of node.children ?? []) {
+    if (child.type !== 'mdxJsxFlowElement' || child.name !== 'Visual') continue
+    const decision = attrValue(child, 'decision')
+    const id = attrValue(child, 'id')
+    const title = attrValue(child, 'title')
+    if (!decision || !id || !title) {
+      issues.push({
+        ...pos(child),
+        message: '<Visual> needs string decision, id, and title attributes.',
+      })
+      continue
+    }
+    const start = child.position?.start.offset
+    const end = child.position?.end?.offset
+    visuals.push({
+      decision,
+      id,
+      title,
+      source:
+        source !== undefined && start !== undefined && end !== undefined
+          ? source.slice(start, end)
+          : JSON.stringify((child.children ?? []).map(positionless)),
+    })
+  }
+  return { visuals, issues }
+}
+
+function parsePlanWorkspace(node: MdNode, source?: string): BlockResult {
+  const code = firstCode(node)
+  if (!code) {
+    return {
+      value: null,
+      issues: [
+        {
+          ...pos(node),
+          message: '<PlanWorkspace> needs one fenced json code block containing its model.',
+        },
+      ],
+    }
+  }
+  let value: unknown
+  try {
+    value = JSON.parse(code.value ?? '')
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    return {
+      value: null,
+      issues: [{ ...pos(code), message: `<PlanWorkspace> contains invalid JSON: ${reason}` }],
+    }
+  }
+  const { visuals, issues: visualIssues } = workspaceVisuals(node, source)
+  if (
+    value &&
+    typeof value === 'object' &&
+    Array.isArray((value as { decisions?: unknown }).decisions)
+  ) {
+    for (const decision of (value as { decisions: { id?: unknown; visuals?: unknown[] }[] })
+      .decisions) {
+      const own = visuals.filter(visual => visual.decision === decision.id)
+      if (own.length) decision.visuals = own.map(({ id, title, source }) => ({ id, title, source }))
+    }
+    const ids = new Set(
+      (value as { decisions: { id?: unknown }[] }).decisions.map(decision => decision.id),
+    )
+    for (const visual of visuals.filter(item => !ids.has(item.decision)))
+      visualIssues.push({
+        ...pos(node),
+        message: `<Visual id="${visual.id}"> names unknown decision "${visual.decision}".`,
+      })
+  }
+  const result = planWorkspaceSchema.safeParse(value)
+  if (result.success) return { value: result.data, issues: visualIssues }
+  return {
+    value,
+    issues: result.error.issues
+      .map(issue => ({
+        ...pos(code),
+        message: `<PlanWorkspace> ${issue.path.join('.') || 'model'}: ${issue.message}`,
+      }))
+      .concat(visualIssues),
+  }
+}
+
+const PARSERS: Record<string, (node: MdNode, source?: string) => BlockResult> = {
   FileTree: parseFileTree,
   Checklist: parseChecklist,
   Questions: parseQuestions,
@@ -445,6 +558,7 @@ const PARSERS: Record<string, (node: MdNode) => BlockResult> = {
   Compare: parseCompare,
   Matrix: parseMatrix,
   Stat: parseStat,
+  PlanWorkspace: parsePlanWorkspace,
 }
 
 /**
@@ -452,8 +566,8 @@ const PARSERS: Record<string, (node: MdNode) => BlockResult> = {
  * `value` is the props object the component validates with zod; `issues` are
  * positioned messages for malformed items, surfaced by `check`.
  */
-export function parseBlockChildren(name: string, node: unknown): BlockResult {
+export function parseBlockChildren(name: string, node: unknown, source?: string): BlockResult {
   const parser = PARSERS[name]
   if (!parser) return { value: null, issues: [] }
-  return parser(node as MdNode)
+  return parser(node as MdNode, source)
 }

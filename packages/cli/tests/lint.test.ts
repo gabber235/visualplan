@@ -22,6 +22,11 @@ describe('lintSource', () => {
   })
 
   describe('all-prose plan', () => {
+    it('accepts a concrete code comparison without requiring a diagram', () => {
+      expect(
+        lintSource('# Ownership\n\n```ts\ninterface Navigator { open(target: Target): void }\n```'),
+      ).toEqual([])
+    })
     it('flags a plan with no diagram or component', () => {
       const source =
         '# Plan\n\nThis plan is written entirely as prose, with no structure to show at all.\n'
@@ -31,6 +36,73 @@ describe('lintSource', () => {
     it('passes a plan with a data component', () => {
       const source = '# Plan\n\n<Checklist title="Done when">\n- [ ] ship it\n</Checklist>\n'
       expect(lintSource(source)).toEqual([])
+    })
+  })
+
+  describe('workspace review scope', () => {
+    const model = {
+      decisions: [
+        {
+          id: 'navigation',
+          title: 'Share destination handling',
+          code: [
+            {
+              id: 'owner',
+              role: 'model',
+              file: 'navigation.ts',
+              symbol: 'Navigator',
+              language: 'typescript',
+              current: 'class Inbox { openInboxTarget(target: Target): void }',
+              proposed: 'interface Navigator { open(target: Target): void }',
+            },
+          ],
+        },
+      ],
+    }
+    const source = (value: unknown) =>
+      `# Navigation\n\n<PlanWorkspace>\n\`\`\`json\n${JSON.stringify(value)}\n\`\`\`\n</PlanWorkspace>\n`
+
+    it('accepts a compact model without mandatory explanation fields', () => {
+      expect(warnings(source(model))).toEqual([])
+    })
+
+    it('requires the code model even when a decision has an implementation snippet', () => {
+      const next = structuredClone(model)
+      next.decisions[0]!.code[0]!.role = 'edit'
+      expect(warnings(source(next)).some(message => message.includes('code model'))).toBe(true)
+    })
+
+    it('catches copied code and implementation routes', () => {
+      const next = structuredClone(model)
+      next.decisions[0]!.code.push({ ...next.decisions[0]!.code[0]!, id: 'copy' })
+      const withRoute = {
+        decisions: [
+          {
+            ...next.decisions[0],
+            route: [
+              {
+                order: 1,
+                change: 'Implement',
+                touchpoints: ['navigation.ts'],
+                dependsOn: [],
+                proof: 'Tests pass',
+              },
+            ],
+          },
+        ],
+      }
+      const messages = warnings(source(withRoute))
+      expect(messages.some(message => message.includes('repeats'))).toBe(true)
+      expect(messages.some(message => message.includes('implementation route'))).toBe(true)
+    })
+
+    it('rejects appended evidence reports while allowing context before the workspace', () => {
+      expect(
+        warnings(`${source(model)}\n## Evidence\n\nTests and research.\n`).some(message =>
+          message.includes('End the plan'),
+        ),
+      ).toBe(true)
+      expect(warnings(`A shared owner handles destinations.\n\n${source(model)}`)).toEqual([])
     })
   })
 

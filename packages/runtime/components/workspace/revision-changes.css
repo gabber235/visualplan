@@ -1,0 +1,202 @@
+/* Changes since the revision the reader last opened: tinted in place, explained on hover. */
+.vp-workspace {
+  --vp-change-tint: color-mix(in srgb, var(--vp-modify) 16%, transparent);
+  --vp-change-added-tint: color-mix(in srgb, var(--vp-done) 15%, transparent);
+}
+
+.vp-workspace [data-change] {
+  border-radius: 4px;
+  cursor: help;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.vp-workspace :is(p, h2, h3, h4, strong, li, article, tr, div, header)[data-change="modified"] {
+  background: var(--vp-change-tint);
+  box-shadow: 0 0 0 3px var(--vp-change-tint);
+}
+.vp-workspace :is(p, h2, h3, h4, strong, li, article, tr, div, header)[data-change="added"] {
+  background: var(--vp-change-added-tint);
+  box-shadow: 0 0 0 3px var(--vp-change-added-tint);
+}
+
+/* Code lines: a tinted row plus a solid marker in the gutter. */
+.vp-main .vp-workspace .ec-line[data-change] {
+  border-radius: 0;
+  background: var(--vp-change-tint);
+  box-shadow: inset 3px 0 0 var(--vp-modify);
+}
+.vp-main .vp-workspace .ec-line[data-change="added"] {
+  background: var(--vp-change-added-tint);
+  box-shadow: inset 3px 0 0 var(--vp-done);
+}
+.vp-main .vp-workspace .ec-line[data-removed] {
+  cursor: help;
+  position: relative;
+}
+.vp-main .vp-workspace .ec-line[data-removed]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--vp-risk);
+}
+.vp-main .vp-workspace .ec-line[data-removed="before"]::before {
+  top: -1px;
+}
+.vp-main .vp-workspace .ec-line[data-removed="after"]::before {
+  bottom: -1px;
+}
+.vp-changed-code[data-change] {
+  box-shadow: inset 3px 0 0 var(--vp-modify);
+}
+
+/* Where a change hides behind navigation: a dot on the tile that contains it. */
+.vp-change-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vp-modify);
+  flex: none;
+}
+.vp-change-dot[data-kind="added"] {
+  background: var(--vp-done);
+}
+.vp-change-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vp-modify);
+  font-size: 12px;
+  font-weight: 600;
+}
+.vp-change-count[data-kind="added"] {
+  color: var(--vp-done);
+}
+
+.vp-revision-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--vp-modify) 40%, var(--vp-border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--vp-modify) 7%, var(--vp-bg));
+}
+.vp-main .vp-revision-summary p {
+  flex: 1 1 320px;
+  margin: 0;
+  font-size: 13px;
+}
+.vp-revision-summary__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vp-modify);
+}
+.vp-workspace .vp-revision-summary > button {
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--vp-border);
+  border-radius: 5px;
+  background: var(--vp-bg);
+  font-size: 13px;
+}
+
+.vp-removed-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex-basis: 100%;
+  color: var(--vp-muted);
+  font-size: 13px;
+}
+.vp-workspace .vp-removed-items button {
+  min-height: 26px;
+  padding: 2px 8px;
+  border: 1px dashed var(--vp-risk-border);
+  border-radius: 5px;
+  background: var(--vp-risk-tint);
+  color: var(--vp-risk);
+  font-size: 12px;
+  text-decoration: line-through;
+  cursor: help;
+}
+
+.vp-change-tooltip {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  gap: 8px;
+  max-width: min(620px, calc(100vw - 16px));
+  max-height: 50vh;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--vp-border-strong);
+  border-radius: 8px;
+  background: var(--vp-bg);
+  color: var(--vp-text);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--vp-text) 16%, transparent);
+  pointer-events: none;
+  font-size: 13px;
+}
+.vp-change-tooltip__title {
+  color: var(--vp-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.vp-main .vp-change-tooltip__words {
+  margin: 0;
+  line-height: 1.6;
+}
+.vp-change-tooltip :is(del, ins) {
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.vp-change-tooltip del {
+  background: var(--vp-risk-tint);
+  color: var(--vp-risk);
+}
+.vp-change-tooltip ins {
+  background: var(--vp-tip-tint);
+  text-decoration: none;
+}
+.vp-main .vp-change-tooltip__code {
+  margin: 0;
+  padding: 8px;
+  border-radius: 5px;
+  background: var(--vp-surface);
+  font: 12.5px / 1.6 var(--vp-mono);
+  white-space: pre;
+  overflow-x: auto;
+}
+.vp-change-tooltip__code del {
+  display: block;
+  text-decoration: none;
+}
+
+@media print {
+  .vp-revision-summary,
+  .vp-change-tooltip {
+    display: none;
+  }
+}
+
+/* Tint the text, not the empty width or stretched height of its box. */
+.vp-workspace :is(h2, h3, h4, strong)[data-change] {
+  width: fit-content;
+  max-width: 100%;
+}
+.vp-workspace article[data-change] {
+  align-self: start;
+  padding-inline: 8px;
+}
+.vp-decision-workbench > header > .vp-removed-items {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}

@@ -63,7 +63,7 @@ polished, self-contained HTML page, so an AI agent can present plans as scannabl
   render's `--no-share` overrides it). `vplan config [get|set|path]` views and edits it.
 
 Plans use a fixed, tiny component vocabulary (`Phase`, `FileTree`, `Chart`, `Compare`, `Matrix`,
-`Callout`, `Questions`, `Checklist`, and ` ```mermaid ` / ` ```math ` fences) with no imports — the
+`Callout`, `Questions`, `Checklist`, `PlanWorkspace`, and ` ```mermaid ` / ` ```math ` fences) with no imports — the
 components are auto-injected into MDX scope. A plan starts with a `# Title` heading; there
 is no frontmatter. `Phase` sections render as a numbered vertical timeline; no sidebar. The
 data components (`FileTree`, `Chart`, `Stat`, `Compare`, `Matrix`, `Questions`, `Checklist`) are authored
@@ -113,7 +113,7 @@ tarball, because the runtime is compiled from source at render time and must phy
 - `tsup` bundles `@visualplan/core` into `dist/` (`noExternal`) for the Node check/components
   path. `compile.ts` resolves the runtime in dev (workspace) or prod (vendored) and aliases
   `@visualplan/core` to the core source in the Vite build either way.
-- `prepack` runs `scripts/vendor.mjs` (copies `packages/runtime` -> `cli/runtime` and the core
+- `build` and `prepack` run `scripts/vendor.mjs` (copies `packages/runtime` -> `cli/runtime` and the core
   entry -> `cli/core/index.ts`, both git-ignored) then `tsup`. `files` ships `dist`, `runtime`,
   `core`. The CI publish (below) uses `npm pkg delete devDependencies` + `npm publish` instead,
   which sidesteps the `workspace:*` protocol entirely.
@@ -140,6 +140,7 @@ A release is cut by creating a GitHub release; the tag is the published version 
 ## Conventions
 
 - TypeScript ESM, biome (`single` quotes, no semicolons), pnpm. Build: tsup. Tests: vitest.
+- Node must be at least 22.12.0, matching the installed Commander and Vite requirements.
 - `tsconfig.base.json` holds shared strict options; each package extends it with its own
   `tsconfig.json` (core/cli are NodeNext, runtime is Bundler + DOM/JSX). `pnpm typecheck`
   runs `tsc` in every package. `pnpm test` runs one vitest config with a project per package.
@@ -171,6 +172,17 @@ A release is cut by creating a GitHub release; the tag is the published version 
   `vendor.mjs`). Never edit them; edit `packages/runtime` / `packages/core` and re-vendor.
 
 ## Key Decisions
+
+- 2026/10/02: Browser review marks persist by artifact path and stable item IDs. Decisions and workspace code blocks use one snapshot based review model. A content or meaning change invalidates the affected mark and shows its delta; unrelated marks remain. The authored source never owns acceptance. Parent states derive from current child marks: a nested denial makes the plan and decision denied and blocks acceptance. Decision actions fill unreviewed code marks without replacing existing marks; undo clears only the decision mark. Why: whole model revision storage discarded useful reviews and forced agents to maintain user progress.
+
+- 2026/10/15: `PlanWorkspace` opens each decision with concrete current and proposed code models, then optional reasoning, useful examples, and decisive edits. Model entries use `role: "model"` in the existing code collection and appear only once. Captions and explanatory fields are optional. Routes and appended reports do not belong in the review surface. The planning skill owns investigation, recursive scope challenges, and constraint discussions.
+
+- 2026/10/15: Saved comments are tied to the content of their semantic target. Reload removes comments for changed or deleted targets and preserves unchanged targets across unrelated edits. Unsaved stale drafts remain recoverable. Export carries source and revision once, precise targets, short selection context, and verbatim comments. Local fingerprints and recovery data stay out of the packet.
+
+- 2026/10/19: Workspace changes are shown in place against the revision the browser opened before the current one, not the previous CLI render, because agents render several times before the reader looks. Changed text and code lines are tinted and explain themselves on hover; removed items are listed per decision. Why: re-reviewing a revision should mean reading only what changed.
+- 2026/10/20: When the browser has no earlier opened revision, highlights compare against what the reader last reviewed, rebuilt from saved review snapshots. Why: plans reviewed before revisions were stored showed nothing until a second revision was opened.
+
+- 2026/10/19: Workspace review is quieter. Comments have no kind selector (unused in practice); sent comments retire when a new revision loads; export drops selection offsets. Examples have one review mark. Accepting the last open block of a changed decision accepts it. `<Visual>` children of `PlanWorkspace` place custom MDX explanations inside a decision, reviewed as part of the decision. Why: review history showed the kind was left on its default, exports were re-sent across revisions, and plans needed explanations other than code.
 
 - 2026-06-28: The Review Queue is a single per-user **detached daemon process** (not a server hosted
   inside the first caller). Why: a caller must return its own verdict to its agent promptly while the

@@ -5,6 +5,7 @@ import remarkMdx from 'remark-mdx'
 import remarkParse from 'remark-parse'
 import { unified } from 'unified'
 import { parseBlockChildren } from '@visualplan/compile'
+import type { PlanWorkspaceModel } from '@visualplan/core'
 import type { CheckIssue } from './check.js'
 
 /**
@@ -47,6 +48,7 @@ const STRUCTURE_COMPONENTS = new Set([
   'Stat',
   'Questions',
   'Svg',
+  'PlanWorkspace',
 ])
 
 interface MdNode {
@@ -82,10 +84,25 @@ export function lintSource(source: string): CheckIssue[] {
       else if (node.name === 'Matrix') lintMatrixCells(node, issues)
       else if (node.name === 'FileTree') lintMoveComments(node, issues)
       else if (node.name === 'Chart') lintChartMagnitude(node, issues)
+      else if (node.name === 'PlanWorkspace') lintWorkspace(node, issues)
     } else if (node.type === 'code' && node.lang === 'mermaid') {
       lintWideMermaid(node, issues)
     }
   })
+
+  const workspaceIndex = tree.children?.findIndex(node => node.name === 'PlanWorkspace') ?? -1
+  if (workspaceIndex >= 0) {
+    const trailing = tree.children
+      ?.slice(workspaceIndex + 1)
+      .find(node => node.type !== 'mdxFlowExpression')
+    if (trailing)
+      issues.push({
+        ...at(trailing),
+        severity: 'warn',
+        message:
+          'End the plan at its change sets. Move necessary context beside the decision and remove trailing reports or appendices.',
+      })
+  }
 
   // A plan with no diagram, timeline, or data component adds nothing over a wall of plain text.
   if (!hasStructure) {
@@ -93,8 +110,7 @@ export function lintSource(source: string): CheckIssue[] {
       line: 1,
       column: 1,
       severity: 'warn',
-      message:
-        'This plan is all prose: no diagram, Phase timeline, or data component. A visual plan should show its structure, or it adds nothing over plain text.',
+      message: 'This plan is all prose. Show the model in code or a structured comparison.',
     })
   }
 
@@ -102,8 +118,41 @@ export function lintSource(source: string): CheckIssue[] {
 }
 
 function isStructural(node: MdNode): boolean {
-  if (node.type === 'code' && (node.lang === 'mermaid' || node.lang === 'math')) return true
+  if (node.type === 'code') return true
   return node.type === 'mdxJsxFlowElement' && !!node.name && STRUCTURE_COMPONENTS.has(node.name)
+}
+
+function lintWorkspace(node: MdNode, issues: CheckIssue[]): void {
+  const { value } = parseBlockChildren('PlanWorkspace', node)
+  if (!value) return
+  const model = value as PlanWorkspaceModel
+  const snippets = new Map<string, string>()
+  const warn = (message: string) => issues.push({ ...at(node), severity: 'warn' as const, message })
+  for (const decision of model.decisions) {
+    if (!decision.code.some(code => code.role === 'model')) {
+      warn(
+        `Decision ${decision.id} needs a current and proposed code model. Mark its comparison with role: "model".`,
+      )
+    }
+    if (decision.route.length) {
+      warn(
+        `Decision ${decision.id} includes an implementation route. Keep necessary ordering or constraints beside the affected model or code.`,
+      )
+    }
+    for (const code of decision.code) {
+      for (const part of ['current', 'proposed', 'diff'] as const) {
+        const content = code[part]?.trim()
+        if (!content) continue
+        const target = `${decision.id}/${code.id}/${part}`
+        const previous = snippets.get(content)
+        if (previous)
+          warn(
+            `Code at ${target} repeats ${previous}. Show the snippet once and reference it where needed.`,
+          )
+        else snippets.set(content, target)
+      }
+    }
+  }
 }
 
 /** A `Phase` that is a long run of prose with no diagram, list, or nested component: an essay where

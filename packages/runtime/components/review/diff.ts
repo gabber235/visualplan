@@ -85,7 +85,7 @@ export function diffOverlays(
  * tokenizes differently from the MDX source (file paths split by separators, table cells, task
  * items), so they are excluded from the prose diff, matching the source-side `PROSE_OPAQUE_COMPONENTS`. */
 const DATA_COMPONENT_SELECTOR =
-  '.vp-filetree, .vp-chart, .vp-matrix-wrap, .vp-compare, .vp-checklist, .vp-stat, .vp-questions'
+  '.vp-filetree, .vp-chart, .vp-matrix-wrap, .vp-compare, .vp-checklist, .vp-stat, .vp-questions, .vp-workspace'
 
 /** The sibling blocks a section owns: from its start element through `lastElement`, so prose in a
  * following sibling (a heading's intro paragraph) is included, not just the start element's subtree. */

@@ -52,7 +52,15 @@ class MemoryStorage implements WebStorage {
 }
 
 function installLocalStorage(target: object): void {
-  if ((target as { localStorage?: unknown }).localStorage != null) return
+  const storage = (target as { localStorage?: Partial<WebStorage> }).localStorage
+  if (
+    storage != null &&
+    typeof storage.clear === 'function' &&
+    typeof storage.getItem === 'function' &&
+    typeof storage.setItem === 'function'
+  ) {
+    return
+  }
   Object.defineProperty(target, 'localStorage', {
     configurable: true,
     writable: true,

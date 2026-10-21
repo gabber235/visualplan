@@ -299,6 +299,8 @@ function stubUnusedRenderersPlugin(source: string): Plugin {
 
 /** How a plan is rendered, beyond its source. Defaults match the CLI (cog + share both on). */
 export interface BuildOptions {
+  /** Original MDX file for resolving exported workspace comments. Absent for memory inputs. */
+  sourcePath?: string
   /** Default color scheme baked into the page. Default `system`. */
   theme?: Theme
   /** Lock the theme: hide the in-page cog and ignore the `localStorage` override, so the rendered
@@ -346,6 +348,19 @@ function planConfigPlugin(theme: Theme, lockTheme: boolean): Plugin {
   }
 }
 
+function planSourcePlugin(sourcePath: string): Plugin {
+  return {
+    name: 'visualplan:source',
+    transformIndexHtml: {
+      order: 'pre',
+      handler() {
+        const source = JSON.stringify(sourcePath).replace(/</g, '\\u003c')
+        return [{ tag: 'script', injectTo: 'head', children: `globalThis.__VP_SOURCE__=${source}` }]
+      },
+    },
+  }
+}
+
 function baseConfig(paths: RuntimePaths, input: PlanInput, options: BuildOptions): InlineConfig {
   const readSource = sourceReader(input)
   const theme = options.theme ?? 'system'
@@ -356,6 +371,8 @@ function baseConfig(paths: RuntimePaths, input: PlanInput, options: BuildOptions
     htmlTitlePlugin(readSource),
     planConfigPlugin(theme, lockTheme),
   ]
+  const sourcePath = typeof input === 'string' ? options.sourcePath : resolve(input.path)
+  if (sourcePath) plugins.push(planSourcePlugin(sourcePath))
   // The share button renders only when its data is injected, so omitting the plugin hides it.
   if (enableSharing) plugins.push(planSharePlugin(readSource))
   // Diff cues render only when a baseline is given, so omitting the plugin leaves a plain render.
@@ -420,7 +437,10 @@ export async function renderToFile(
 ): Promise<void> {
   const raw = readFileSync(resolve(mdxPath), 'utf8').replace(/^\ufeff/, '')
   const { source } = await inlineSvgIncludes(raw, dirname(resolve(mdxPath)))
-  await writeFile(resolve(outPath), await buildHtml(source, { theme }))
+  await writeFile(
+    resolve(outPath),
+    await buildHtml(source, { theme, sourcePath: resolve(mdxPath) }),
+  )
 }
 
 export interface DevServer {

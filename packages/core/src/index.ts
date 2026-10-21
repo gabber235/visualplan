@@ -241,6 +241,367 @@ export const statSchema = z.object({
     .min(1, 'stat needs at least one item'),
 })
 
+export const DECISION_STATUS_VALUES = ['proposed', 'accepted', 'challenged', 'superseded'] as const
+export const SYSTEM_NODE_KIND_VALUES = [
+  'interface',
+  'service',
+  'state',
+  'store',
+  'client',
+  'external',
+] as const
+
+const sourceRefSchema = z.object({
+  file: z.string().min(1),
+  symbol: z.string().min(1).optional(),
+  line: z.number().int().positive().optional(),
+})
+
+const contractPrimerSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  kind: z.string().min(1).optional(),
+  purpose: z.string().min(1),
+  owner: z.string().min(1),
+  inputs: z.array(z.string().min(1)).default([]),
+  outputs: z.array(z.string().min(1)).default([]),
+  guarantees: z.array(z.string().min(1)).default([]),
+  sideEffects: z.array(z.string().min(1)).default([]),
+  failures: z.array(z.string().min(1)).default([]),
+  callers: z.array(z.string().min(1)).default([]),
+  implementations: z.array(z.string().min(1)).default([]),
+  source: sourceRefSchema,
+  change: z.string().min(1).optional(),
+})
+
+const mechanismScenarioSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  summary: z.string().min(1).optional(),
+  sequence: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        from: z.string().min(1),
+        to: z.string().min(1),
+        label: z.string().min(1),
+        detail: z.string().min(1).optional(),
+        contractId: z.string().min(1).optional(),
+        failure: z.boolean().optional(),
+      }),
+    )
+    .default([]),
+  states: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        label: z.string().min(1),
+        owner: z.string().min(1).optional(),
+        summary: z.string().min(1).optional(),
+      }),
+    )
+    .default([]),
+  transitions: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        from: z.string().min(1),
+        to: z.string().min(1),
+        label: z.string().min(1),
+        contractId: z.string().min(1).optional(),
+        failure: z.boolean().optional(),
+      }),
+    )
+    .default([]),
+  ownership: z
+    .array(
+      z.object({
+        concept: z.string().min(1),
+        owner: z.string().min(1),
+        writers: z.array(z.string().min(1)).default([]),
+        readers: z.array(z.string().min(1)).default([]),
+        note: z.string().min(1).optional(),
+      }),
+    )
+    .default([]),
+  dataFlow: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        from: z.string().min(1),
+        to: z.string().min(1),
+        value: z.string().min(1),
+        detail: z.string().min(1).optional(),
+        contractId: z.string().min(1).optional(),
+        failure: z.boolean().optional(),
+      }),
+    )
+    .default([]),
+})
+
+const codeContractSchema = z
+  .object({
+    id: z.string().min(1),
+    file: z.string().min(1),
+    symbol: z.string().min(1),
+    language: z.string().min(1).optional(),
+    role: z.enum(['model', 'edit']).default('edit'),
+    summary: z.string().min(1).optional(),
+    change: z.enum(['modify', 'add', 'delete', 'move']).default('modify'),
+    current: z.string().optional(),
+    proposed: z.string().min(1).optional(),
+    diff: z.string().min(1).optional(),
+    invariants: z.array(z.string().min(1)).default([]),
+    callers: z.array(z.string().min(1)).default([]),
+  })
+  .superRefine((contract, context) => {
+    if (
+      contract.role === 'model' &&
+      (!contract.current?.trim() || !contract.proposed?.trim() || contract.diff !== undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['current'],
+        message: 'model comparison needs current and proposed code, without a diff',
+      })
+    }
+    const removal =
+      contract.role === 'edit' && contract.change === 'delete' && contract.current?.trim()
+    if (contract.proposed === undefined && contract.diff === undefined && !removal) {
+      context.addIssue({
+        code: 'custom',
+        path: ['proposed'],
+        message: 'code change needs proposed code, a diff, or current code to delete',
+      })
+    }
+  })
+
+const reasoningCardSchema = z.object({
+  id: z.string().min(1).optional(),
+  title: z.string().min(1),
+  detail: z.string().min(1).optional(),
+})
+
+const ownershipChangeSchema = z.object({
+  id: z.string().min(1),
+  area: z.string().min(1),
+  current: z.string().min(1),
+  proposed: z.string().min(1),
+  removed: z.array(z.string().min(1)).default([]),
+})
+
+const exampleValueSchema = z.object({
+  label: z.string().min(1),
+  value: z.string().min(1),
+  language: z.string().min(1).default('json'),
+})
+
+const developerExampleSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1).optional(),
+  language: z.string().min(1),
+  code: z.string().min(1),
+  outcome: z.string().min(1).optional(),
+  result: exampleValueSchema.optional(),
+})
+
+/** Filled by the compiler from `<Visual>` children of `<PlanWorkspace>`; `source` is the MDX. */
+const decisionVisualSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  source: z.string(),
+})
+
+const implementationStepSchema = z.object({
+  order: z.number().int().positive(),
+  change: z.string().min(1),
+  touchpoints: z.array(z.string().min(1)).min(1),
+  dependsOn: z.array(z.string().min(1)).default([]),
+  proof: z.string().min(1),
+})
+
+const decisionSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  status: z.enum(DECISION_STATUS_VALUES).default('proposed'),
+  goal: z.string().min(1).optional(),
+  ownership: z.array(ownershipChangeSchema).default([]),
+  reasoning: z
+    .object({
+      benefits: z.array(reasoningCardSchema).default([]),
+      costs: z.array(reasoningCardSchema).default([]),
+    })
+    .optional(),
+  summary: z.string().min(1).optional(),
+  rationale: z.string().min(1).optional(),
+  systemNodeIds: z.array(z.string().min(1)).default([]),
+  alternatives: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        consequence: z.string().min(1),
+        selected: z.boolean().optional(),
+      }),
+    )
+    .default([]),
+  consequences: z.array(z.string().min(1)).default([]),
+  risks: z.array(z.string().min(1)).default([]),
+  assumptions: z.array(z.string().min(1)).default([]),
+  contracts: z.array(contractPrimerSchema).default([]),
+  scenarios: z.array(mechanismScenarioSchema).default([]),
+  examples: z.array(developerExampleSchema).default([]),
+  visuals: z.array(decisionVisualSchema).default([]),
+  flows: z
+    .never({
+      error: 'Code paths were replaced by developer examples. Author examples instead of flows.',
+    })
+    .optional(),
+  code: z.array(codeContractSchema).default([]),
+  route: z.array(implementationStepSchema).default([]),
+})
+
+export const planWorkspaceSchema = z
+  .object({
+    vision: z
+      .object({
+        problem: z.string().min(1),
+        outcome: z.string().min(1),
+        principles: z.array(z.string().min(1)).default([]),
+      })
+      .optional(),
+    thesis: z.string().min(1).optional(),
+    system: z
+      .object({
+        nodes: z
+          .array(
+            z.object({
+              id: z.string().min(1),
+              label: z.string().min(1),
+              kind: z.enum(SYSTEM_NODE_KIND_VALUES),
+              owner: z.string().min(1),
+              summary: z.string().min(1),
+              layer: z.number().int().nonnegative().default(0),
+              current: z.string().min(1).optional(),
+              proposed: z.string().min(1).optional(),
+            }),
+          )
+          .default([]),
+        edges: z
+          .array(
+            z.object({
+              id: z.string().min(1),
+              from: z.string().min(1),
+              to: z.string().min(1),
+              label: z.string().min(1),
+              decisionIds: z.array(z.string().min(1)).default([]),
+            }),
+          )
+          .default([]),
+      })
+      .default({ nodes: [], edges: [] }),
+    decisions: z.array(decisionSchema).min(1),
+  })
+  .superRefine((model, context) => {
+    const unique = (values: string[]) => new Set(values).size === values.length
+    const nodeIds = model.system.nodes.map(node => node.id)
+    const decisionIds = model.decisions.map(decision => decision.id)
+    if (!unique(nodeIds)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['system', 'nodes'],
+        message: 'node ids must be unique',
+      })
+    }
+    if (!unique(decisionIds)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['decisions'],
+        message: 'decision ids must be unique',
+      })
+    }
+    const nodes = new Set(nodeIds)
+    const decisions = new Set(decisionIds)
+    for (const [index, edge] of model.system.edges.entries()) {
+      if (!nodes.has(edge.from) || !nodes.has(edge.to)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['system', 'edges', index],
+          message: 'edge endpoints must reference system node ids',
+        })
+      }
+      if (edge.decisionIds.some(id => !decisions.has(id))) {
+        context.addIssue({
+          code: 'custom',
+          path: ['system', 'edges', index, 'decisionIds'],
+          message: 'edge decision ids must reference decisions',
+        })
+      }
+    }
+    for (const [index, decision] of model.decisions.entries()) {
+      if (!unique(decision.ownership.map(row => row.id))) {
+        context.addIssue({
+          code: 'custom',
+          path: ['decisions', index, 'ownership'],
+          message: 'ownership row ids must be unique within a decision',
+        })
+      }
+      for (const kind of ['benefits', 'costs'] as const) {
+        const cards = decision.reasoning?.[kind] ?? []
+        if (!unique(cards.map((card, position) => card.id ?? String(position)))) {
+          context.addIssue({
+            code: 'custom',
+            path: ['decisions', index, 'reasoning', kind],
+            message: 'reasoning card anchors must be unique within their group',
+          })
+        }
+      }
+      if (decision.systemNodeIds.some(id => !nodes.has(id))) {
+        context.addIssue({
+          code: 'custom',
+          path: ['decisions', index, 'systemNodeIds'],
+          message: 'decision system node ids must reference system nodes',
+        })
+      }
+      const contractIds = new Set(decision.contracts.map(contract => contract.id))
+      const referencedContracts = decision.scenarios.flatMap(scenario => [
+        ...scenario.sequence.map(step => step.contractId),
+        ...scenario.transitions.map(transition => transition.contractId),
+        ...scenario.dataFlow.map(flow => flow.contractId),
+      ])
+      if (referencedContracts.some(id => id && !contractIds.has(id))) {
+        context.addIssue({
+          code: 'custom',
+          path: ['decisions', index, 'scenarios'],
+          message: 'scenario contract ids must reference contracts in the same decision',
+        })
+      }
+      if (!unique(decision.visuals.map(visual => visual.id))) {
+        context.addIssue({
+          code: 'custom',
+          path: ['decisions', index, 'visuals'],
+          message: 'visual ids must be unique within a decision',
+        })
+      }
+      if (!unique(decision.examples.map(example => example.id))) {
+        context.addIssue({
+          code: 'custom',
+          path: ['decisions', index, 'examples'],
+          message: 'example ids must be unique within a decision',
+        })
+      }
+      if (!unique(decision.code.map(code => code.id))) {
+        context.addIssue({
+          code: 'custom',
+          path: ['decisions', index, 'code'],
+          message: 'code change ids must be unique within a decision',
+        })
+      }
+    }
+  })
+
+export type PlanWorkspaceModel = z.infer<typeof planWorkspaceSchema>
+
 /** Describes a component for the `components` printer and the static checker. */
 export interface CatalogEntry {
   name: string
@@ -331,6 +692,24 @@ export const stat: CatalogEntry = {
     '<Stat>\n- Files changed: 12\n- Est. uptime: 99.9% (good)\n- RPO: 5 min (risk) -- worst-case data loss\n</Stat>',
 }
 
+export const planWorkspace: CatalogEntry = {
+  name: 'PlanWorkspace',
+  summary:
+    'Code models, optional ownership comparisons, reasoning, examples, and edits including pure removals with anchored review. Its single json code block is the canonical model.',
+  staticEnums: {},
+  example:
+    '<PlanWorkspace>\n```json\n{"decisions":[{"id":"ownership","title":"One writer","code":[{"id":"owner","role":"model","file":"editor.ts","symbol":"Editor","language":"typescript","current":"interface Editor { state: MutableState }","proposed":"interface Editor { apply(command: Command): Result }"}]}]}\n```\n</PlanWorkspace>',
+}
+
+export const visual: CatalogEntry = {
+  name: 'Visual',
+  summary:
+    'A custom explanation inside one PlanWorkspace decision: any MDX content (mermaid, Matrix, Compare, Chart, Svg, tables, short prose) placed after the json block. decision names the decision id, id is stable within it, title heads it. It renders before the code model, takes comments, and its source is part of the decision review.',
+  staticEnums: {},
+  example:
+    '<Visual decision="ownership" id="write-path" title="Who writes the page">\n```mermaid\nflowchart LR\n  Editor --> Command --> Store\n```\n</Visual>',
+}
+
 export const mermaid: CatalogEntry = {
   name: 'mermaid (code fence)',
   summary:
@@ -366,6 +745,8 @@ export const CATALOG: readonly CatalogEntry[] = [
   questions,
   checklist,
   stat,
+  planWorkspace,
+  visual,
   svg,
   mermaid,
   math,

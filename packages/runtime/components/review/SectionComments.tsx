@@ -19,7 +19,7 @@ export interface Section {
  * otherwise collapse into one oversized first section. `.vp-matrix-wrap` is the Matrix's scroll
  * wrapper (its real top-level element). */
 const SECTION_START_SELECTOR =
-  '.vp-phase, h1, h2, h3, .vp-callout, .vp-mermaid, .vp-svg, .vp-chart, .vp-filetree, .vp-matrix-wrap, .vp-compare, .vp-checklist, .vp-stat, .vp-questions'
+  '.vp-phase, h1, h2, h3, .vp-callout, .vp-mermaid, .vp-svg, .vp-chart, .vp-filetree, .vp-matrix-wrap, .vp-compare, .vp-checklist, .vp-stat, .vp-questions, .vp-workspace'
 
 /** Friendly labels for blocks with no heading text of their own, by the class that identifies each. */
 const BLOCK_LABELS: ReadonlyArray<[string, string]> = [
@@ -28,6 +28,7 @@ const BLOCK_LABELS: ReadonlyArray<[string, string]> = [
   ['.vp-filetree', 'File changes'],
   ['.vp-matrix-wrap', 'Comparison'],
   ['.vp-compare', 'Comparison'],
+  ['.vp-workspace', 'Interactive plan'],
 ]
 
 /** Derive a human label the agent can map back to the MDX: a Phase/heading's text, a block's own

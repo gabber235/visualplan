@@ -43,6 +43,8 @@ through the workspace.
   `(intent)` is validated against `STAT_INTENT_VALUES`). `parseChart` adds shape guards:
   `SINGLE_SERIES_CHARTS` (`pie`, `gauge`, `funnel`, `treemap`) reject a multi-series table, and
   `scatter` requires a table with exactly two value columns (the list form is rejected).
+  `PlanWorkspace` is the exception: its first fenced block is parsed as JSON and validated as one canonical model.
+  During rendering, `remarkPlanBlocks` also emits a child code slot for each change set snippet, illustrative usage snippet, and optional example result. Those are real code nodes processed by the same Expressive Code plugin as normal fences. Only highlighted markup and styles enter the portable output; no language grammar downloads are required in the rendered page.
   `parseFileTree` splits a trailing `' -- <note>'` (or a dangling `' --'`) into an optional
   `comment` BEFORE the change/path/move parse, so a comment containing `->` is never read as a move
   arrow; icons are NOT resolved here (that is the CLI-only `remark-filetree-icons` pass).

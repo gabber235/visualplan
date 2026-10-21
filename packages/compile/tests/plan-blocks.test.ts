@@ -358,3 +358,73 @@ describe('Compare block', () => {
     expect(issues.some(issue => /must follow an option heading/.test(issue.message))).toBe(true)
   })
 })
+
+describe('PlanWorkspace block', () => {
+  const json = JSON.stringify({
+    thesis: 'One owner',
+    system: {
+      nodes: [
+        { id: 'api', label: 'API', kind: 'service', owner: 'Realm', summary: 'Applies commands' },
+      ],
+      edges: [],
+    },
+    decisions: [
+      {
+        id: 'D1',
+        title: 'One writer',
+        summary: 'Route every write through one owner',
+        rationale: 'Preserve invariants',
+        systemNodeIds: ['api'],
+        scenarios: [{ id: 'happy', label: 'Success' }],
+      },
+    ],
+  })
+
+  it('parses and validates one canonical json model (golden)', () => {
+    const { value, issues } = parseBlock(
+      'PlanWorkspace',
+      `<PlanWorkspace>\n\`\`\`json\n${json}\n\`\`\`\n</PlanWorkspace>\n`,
+    )
+    expect(issues).toEqual([])
+    expect(value).toMatchObject({ thesis: 'One owner' })
+  })
+
+  it('reports invalid json at the code block (error)', () => {
+    const { issues } = parseBlock(
+      'PlanWorkspace',
+      '<PlanWorkspace>\n```json\n{"broken":\n```\n</PlanWorkspace>\n',
+    )
+    expect(issues[0]?.message).toMatch(/invalid JSON/)
+  })
+
+  it('reports missing canonical data (edge)', () => {
+    const { issues } = parseBlock('PlanWorkspace', '<PlanWorkspace>\nempty\n</PlanWorkspace>\n')
+    expect(issues[0]?.message).toMatch(/needs one fenced json code block/)
+  })
+  it('attaches each Visual to its decision with its exact MDX source (golden)', () => {
+    const visual =
+      '<Visual decision="D1" id="flow" title="Write path">\n- Editor\n- Store\n</Visual>'
+    const source = `<PlanWorkspace>\n\`\`\`json\n${json}\n\`\`\`\n\n${visual}\n</PlanWorkspace>\n`
+    const tree = unified().use(remarkParse).use(remarkGfm).use(remarkMdx).parse(source)
+    let node: unknown
+    visit(tree, 'mdxJsxFlowElement', (found: { name?: string | null }) => {
+      if (found.name === 'PlanWorkspace') node = found
+    })
+    const { value, issues } = parseBlockChildren('PlanWorkspace', node, source)
+    expect(issues).toEqual([])
+    expect(value).toMatchObject({
+      decisions: [{ visuals: [{ id: 'flow', title: 'Write path', source: visual }] }],
+    })
+  })
+
+  it('reports a Visual that names an unknown decision or lacks attributes (error)', () => {
+    const { issues } = parseBlock(
+      'PlanWorkspace',
+      `<PlanWorkspace>\n\`\`\`json\n${json}\n\`\`\`\n\n<Visual decision="D9" id="flow" title="Flow">\ntext\n</Visual>\n\n<Visual id="bare">\ntext\n</Visual>\n</PlanWorkspace>\n`,
+    )
+    expect(issues.map(issue => issue.message)).toEqual([
+      '<Visual> needs string decision, id, and title attributes.',
+      '<Visual id="flow"> names unknown decision "D9".',
+    ])
+  })
+})

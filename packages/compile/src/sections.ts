@@ -70,6 +70,7 @@ const JSX_SECTION_TYPES: Record<string, string> = {
   Checklist: 'checklist',
   Stat: 'stat',
   Questions: 'questions',
+  PlanWorkspace: 'workspace',
 }
 
 interface MdastNode {
@@ -133,6 +134,7 @@ const PROSE_OPAQUE_COMPONENTS = new Set([
   'Checklist',
   'Stat',
   'Questions',
+  'PlanWorkspace',
 ])
 
 /** The prose text of a node: text within `paragraph`/`listItem` nodes only (no headings, titles, or
@@ -208,6 +210,8 @@ function describeJsxSection(node: MdastNode, type: string): StartDescriptor {
       return titleAttr('Stat')
     case 'questions':
       return titleAttr('Open questions')
+    case 'workspace':
+      return { type, label: 'Interactive plan', titled: false }
     case 'callout': {
       // A callout has no title; its rendered label is the type word (Risk/Decision/...). It keys by
       // content (titleless) so two same-type callouts stay distinct and an edited body is a rename.

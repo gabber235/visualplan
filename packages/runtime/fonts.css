@@ -1,0 +1,47 @@
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("./fonts/IBMPlexSansVar-Roman.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("./fonts/IBMPlexSansVar-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lilex Nerd Font Mono";
+  src: url("./fonts/LilexNerdFontMono-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lilex Nerd Font Mono";
+  src: url("./fonts/LilexNerdFontMono-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lilex Nerd Font Mono";
+  src: url("./fonts/LilexNerdFontMono-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lilex Nerd Font Mono";
+  src: url("./fonts/LilexNerdFontMono-BoldItalic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+}

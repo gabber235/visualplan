@@ -120,3 +120,83 @@ flowchart LR
   Mark code at build time with Expressive Code: ` ```ts ins={2} del={1} "Bearer" ` highlights
   inserted/removed lines and any matching text. No component needed.
 </Callout>
+
+## Interactive review
+
+<PlanWorkspace>
+```json
+{
+  "thesis": "The gateway owns rate-limit policy and Redis owns shared counters.",
+  "system": {
+    "nodes": [
+      { "id": "client", "label": "Client", "kind": "client", "owner": "Caller", "summary": "Sends authenticated requests", "layer": 0 },
+      { "id": "gateway", "label": "Gateway", "kind": "service", "owner": "Edge", "summary": "Enforces limits", "layer": 1 },
+      { "id": "redis", "label": "Redis", "kind": "store", "owner": "Platform", "summary": "Stores shared counters", "layer": 2 }
+    ],
+    "edges": [
+      { "id": "request", "from": "client", "to": "gateway", "label": "HTTP request", "decisionIds": ["D1"] },
+      { "id": "count", "from": "gateway", "to": "redis", "label": "increment window", "decisionIds": ["D1"] }
+    ]
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "title": "Enforce limits at the gateway",
+      "summary": "Every public request crosses one shared limiter before service dispatch.",
+      "rationale": "One boundary prevents per-service policy drift.",
+      "systemNodeIds": ["gateway", "redis"],
+      "consequences": ["Gateway availability remains critical"],
+      "risks": ["Redis failure must not reject all traffic"],
+      "contracts": [
+        {
+          "id": "allow",
+          "name": "RateLimiter.allow",
+          "kind": "interface",
+          "purpose": "Decides whether one token may enter the API.",
+          "owner": "Gateway",
+          "inputs": ["token"],
+          "outputs": ["allow or reject"],
+          "guarantees": ["One shared window across gateway nodes"],
+          "failures": ["Redis outage fails open"],
+          "callers": ["Gateway middleware"],
+          "implementations": ["RedisRateLimiter"],
+          "source": { "file": "src/gateway/rate-limiter.ts", "symbol": "allow" },
+          "change": "Return an explicit decision with retry metadata."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "allowed",
+          "label": "Request under limit",
+          "sequence": [
+            { "id": "check", "from": "Gateway", "to": "Redis", "label": "increment counter", "contractId": "allow" },
+            { "id": "dispatch", "from": "Gateway", "to": "API", "label": "dispatch request" },
+            { "id": "outage", "from": "Redis", "to": "Gateway", "label": "counter unavailable", "contractId": "allow", "failure": true }
+          ],
+          "ownership": [
+            { "concept": "Limit policy", "owner": "Gateway", "writers": ["Gateway config"], "readers": ["Gateway middleware"] },
+            { "concept": "Window counter", "owner": "Redis", "writers": ["RedisRateLimiter"], "readers": ["RedisRateLimiter"] }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "id": "allow",
+          "file": "src/gateway/rate-limiter.ts",
+          "symbol": "RateLimiter.allow",
+          "language": "typescript",
+          "summary": "Typed decision boundary for request admission.",
+          "current": "allow(token: string): Promise<boolean>",
+          "proposed": "allow(token: Token): Promise<RateLimitDecision>",
+          "invariants": ["Redis failure returns AllowDegraded"],
+          "callers": ["gatewayMiddleware"]
+        }
+      ],
+      "route": [
+        { "order": 1, "change": "Introduce the typed decision", "touchpoints": ["rate-limiter.ts", "middleware.ts"], "proof": "Boundary tests cover allow, reject, and degraded outcomes" }
+      ]
+    }
+  ]
+}
+```
+</PlanWorkspace>

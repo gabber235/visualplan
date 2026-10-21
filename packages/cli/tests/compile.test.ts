@@ -52,6 +52,10 @@ describe('renderToFile', () => {
     expect(html).toContain('<title>Add rate limiting to the API</title>')
   })
 
+  it('retains the source file for resolving compact workspace feedback', () => {
+    expect(html).toContain(`globalThis.__VP_SOURCE__=${JSON.stringify(examplePath)}`)
+  })
+
   it('highlights code via Expressive Code with a file title (golden)', () => {
     // the build runs rehype-expressive-code; the ```ts block has title="...rate-limiter.ts"
     expect(html).toContain('expressive-code')
@@ -116,6 +120,16 @@ describe('renderToFile', () => {
 })
 
 describe('content-aware bundling', () => {
+  it('escapes source metadata and omits it for anonymous memory input', async () => {
+    const path = '/tmp/</script><script>bad()</script>/plan.mdx'
+    const withSource = await buildHtml('# Plan', { sourcePath: path, enableSharing: false })
+    expect(withSource).toContain(
+      `globalThis.__VP_SOURCE__=${JSON.stringify(path).replace(/</g, '\\u003c')}`,
+    )
+    expect(withSource).not.toContain('</script><script>bad()')
+    const anonymous = await buildHtml('# Plan', { enableSharing: false })
+    expect(anonymous).not.toMatch(/globalThis\.__VP_SOURCE__=/)
+  }, 60_000)
   // The two heaviest renderers and their dep subtrees dominate the single-file output: a mermaid
   // diagram pulls in beautiful-mermaid + elkjs (a ~1.5MB layout engine, the `elk.algorithm` marker),
   // a chart pulls in recharts (~450KB, the `recharts-` class-prefix marker). buildHtml stubs the ones

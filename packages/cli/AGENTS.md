@@ -245,10 +245,10 @@ them. The `tests/compile.test.ts` "renders a plan outside any node project" case
   (`noExternal`) into `dist` for the Node path.
 - The vendored `cli/runtime` and `cli/core` are **generated and git-ignored** (written by
   `vendor.mjs`, included in the tarball via `files`). Never edit them; edit the source packages.
-  **Gotcha:** if these dirs exist during local dev, `findRuntimePaths` prefers them over the
-  workspace source, so a stale copy silently shadows your runtime/core edits at render time. After
-  changing the runtime or core, re-vendor (`pnpm --filter vplan vendor`) or remove `cli/runtime` +
-  `cli/core` so renders pick up the workspace source again.
+  `findRuntimePaths` prefers these copies when they exist. `pnpm build` and
+  `pnpm --filter vplan build` refresh them before tsup, so ordinary builds include current source.
+  When running directly from source after editing runtime or core, refresh them with
+  `pnpm --filter vplan vendor`.
 - **`tsup.config.ts` is two configs, not one.** The CLI bin (`src/index.ts`) needs the
   `#!/usr/bin/env node` shebang banner; the library entry (`src/api.ts`) must NOT carry it (it would
   be a stray line atop an imported module) and needs `.d.ts` types the bin does not. They cannot

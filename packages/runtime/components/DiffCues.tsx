@@ -73,12 +73,26 @@ function DiffOverlay({ diff }: { diff: NonNullable<ReturnType<typeof readDiff>> 
     }
   }, [showChanges, sections, diff])
 
-  const changedCount = diff.sections.filter(s => isChanged(s.status)).length
+  // A PlanWorkspace marks its own changes field by field, so its section is left to it here.
+  const owned = new Set(
+    sections
+      .filter(section =>
+        sectionOwnedElements(section).some(
+          element => element.matches('.vp-workspace') || element.querySelector('.vp-workspace'),
+        ),
+      )
+      .map(section => section.index),
+  )
+  const changedCount = diff.sections.filter(
+    (s, index) => isChanged(s.status) && !owned.has(index),
+  ).length
   const removedCount = diff.removed.length
   // A re-render of an identical plan has nothing to surface, so show no chrome at all.
   if (changedCount === 0 && removedCount === 0) return null
 
-  const overlays = diffOverlays(sections, diff, showChanges)
+  const overlays = diffOverlays(sections, diff, showChanges).filter(
+    overlay => !owned.has(overlay.sectionIndex),
+  )
   // The toggle only does something when the bars are mapped (the diff and DOM section counts agree).
   const mapped = sections.length === diff.sections.length
 

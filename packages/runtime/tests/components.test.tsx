@@ -16,7 +16,15 @@ import { ReviewLayer } from '../components/review/ReviewLayer.js'
 import { copyText, ShareButton } from '../components/ShareButton.js'
 import { Stat } from '../components/Stat.js'
 import { ThemeToggle } from '../components/ThemeToggle.js'
+import { PlanWorkspace } from '../components/workspace/PlanWorkspace.js'
+import { feedbackKey } from '../components/workspace/feedback.js'
 import { Layout } from '../Layout.js'
+
+vi.mock('../components/workspace/review-storage.js', () => ({
+  readSavedFeedback: async (key: string, legacyKey: string) =>
+    localStorage.getItem(key) ?? localStorage.getItem(legacyKey),
+  writeSavedFeedback: async (key: string, value: string) => localStorage.setItem(key, value),
+}))
 
 describe('Phase', () => {
   it('renders the title and a status badge for active/done (golden)', () => {
@@ -713,6 +721,152 @@ describe('Stat', () => {
 
   it('throws on an empty item list (error)', () => {
     expect(() => renderToStaticMarkup(<Stat items={statItems([])} />)).toThrow(/at least one item/)
+  })
+})
+
+describe('PlanWorkspace', () => {
+  const model = {
+    vision: {
+      problem: 'Page mutations currently have several writers',
+      outcome: 'Route page mutations through one owner',
+      principles: ['One writer', 'Typed commands'],
+    },
+    decisions: [
+      {
+        id: 'D1',
+        title: 'One mutation owner',
+        status: 'proposed',
+        goal: 'The Realm coordinator applies typed page mutations and returns the updated page.',
+        reasoning: {
+          benefits: [
+            { title: 'One invariant boundary', detail: 'One writer preserves page invariants.' },
+          ],
+          costs: [
+            { title: 'Caller migration', detail: 'Every direct writer must send a command.' },
+          ],
+        },
+        examples: [
+          {
+            id: 'successful-edit',
+            title: 'Apply one title edit',
+            description: 'A panel developer submits a typed mutation to the proposed owner.',
+            language: 'kotlin',
+            code: 'val page = coordinator.apply(PageMutation.SetTitle("New title"))',
+            outcome: 'The developer receives the updated page with its new revision.',
+            result: { label: 'Updated page', value: '{ "title": "New title", "revision": 7 }' },
+          },
+          {
+            id: 'stale-edit',
+            title: 'Handle a stale title edit',
+            description: 'A developer handles an edit based on an outdated revision.',
+            language: 'kotlin',
+            code: 'when (val result = coordinator.apply(command)) {\n  is Result.Stale -> editor.refresh(result.page)\n  is Result.Applied -> editor.show(result.page)\n}',
+            outcome:
+              'The caller can refresh the stale draft without treating it as a successful edit.',
+          },
+        ],
+        code: [
+          {
+            id: 'apply',
+            file: 'services/PageMutation.kt',
+            symbol: 'apply',
+            language: 'kotlin',
+            summary: 'Typed mutation boundary',
+            current: 'fun write(value: Any)',
+            proposed: 'fun apply(command: PageMutation): Result<Page>',
+            invariants: ['Page revision advances once'],
+            callers: ['PanelCommandHandler'],
+          },
+        ],
+        route: [
+          {
+            order: 1,
+            change: 'Introduce command',
+            touchpoints: ['PageMutation.kt'],
+            proof: 'Contract test passes',
+          },
+        ],
+      },
+    ],
+  }
+
+  it('renders vision, decision reasoning, developer examples, and change set (golden)', () => {
+    const html = renderToStaticMarkup(<PlanWorkspace model={model} />)
+    expect(html).toContain('Page mutations currently have several writers')
+    expect(html).toContain('One mutation owner')
+    expect(html).toContain('>Accept</button>')
+    expect(html).toContain('vp-workspace__main')
+    expect(html).toContain('>Examples</h3>')
+    expect(html).not.toContain('>Illustrative usage</strong>')
+    expect(html).not.toContain('>Expected behavior</strong>')
+    expect(html).toContain('Handle a stale title edit')
+    expect(html).toContain('Change set')
+    expect(html).not.toContain('>Challenge</button>')
+    expect(html).not.toContain('vp-system-map')
+    expect(html).not.toContain('Implementation route')
+  })
+
+  it('shows independent examples and accepts the decision (golden)', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+
+    await act(async () => root.render(<PlanWorkspace model={model} />))
+    const examples = container.querySelectorAll('.vp-developer-experience__example')
+    expect(examples).toHaveLength(2)
+    expect(examples[0]?.textContent).toContain('Updated page')
+    expect(examples[1]?.textContent).toContain('editor.refresh')
+    expect(examples[1]?.querySelector('[data-review-id="result"]')).toBeNull()
+
+    const accept = container.querySelector<HTMLButtonElement>('[data-action="accept"]')
+    await act(async () => accept?.click())
+    expect(accept?.textContent).toBe('Undo accept')
+    expect(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('1')
+    await act(async () => accept?.click())
+    expect(accept?.textContent).toBe('Accepted')
+    expect(accept?.disabled).toBe(true)
+    expect(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('1')
+
+    await act(async () => root.unmount())
+    container.remove()
+  })
+
+  it('omits the developer section when no usage examples apply', () => {
+    const withoutExamples = {
+      ...model,
+      decisions: [{ ...model.decisions[0], examples: [] }],
+    }
+    const html = renderToStaticMarkup(<PlanWorkspace model={withoutExamples} />)
+    expect(html).not.toContain('Developer experience')
+    expect(html).toContain('Change set')
+  })
+
+  it('renders benefit and cost reasoning as visible cards', () => {
+    const html = renderToStaticMarkup(<PlanWorkspace model={model} />)
+    expect(html).toContain('data-kind="benefit"')
+    expect(html).toContain('One invariant boundary')
+    expect(html).toContain('data-kind="cost"')
+    expect(html).toContain('Caller migration')
+    expect(html).not.toContain('<details')
+  })
+
+  it('ignores authored acceptance and preserves a browser review after remount', async () => {
+    const accepted = { ...model, decisions: [{ ...model.decisions[0], status: 'accepted' }] }
+    const key = feedbackKey(location.pathname)
+    const prior = localStorage.getItem(key)
+    localStorage.removeItem(key)
+    const container = document.createElement('div')
+    const root = createRoot(container)
+    await act(async () => root.render(<PlanWorkspace model={accepted} />))
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[data-action="accept"]')?.click(),
+    )
+    expect(container.querySelector('[data-action="accept"]')?.textContent).toBe('Undo accept')
+    await act(async () => root.render(<PlanWorkspace key='remount' model={accepted} />))
+    expect(container.querySelector('[data-action="accept"]')?.textContent).toBe('Undo accept')
+    await act(async () => root.unmount())
+    if (prior === null) localStorage.removeItem(key)
+    else localStorage.setItem(key, prior)
   })
 })
 

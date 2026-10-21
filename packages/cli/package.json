@@ -27,7 +27,7 @@
   "bugs": "https://github.com/brandonburrus/visualplan/issues",
   "type": "module",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.12.0"
   },
   "bin": {
     "vplan": "dist/index.js"
@@ -47,7 +47,7 @@
     "core"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "node scripts/vendor.mjs && tsup",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "vendor": "node scripts/vendor.mjs",

@@ -25,6 +25,8 @@ npx skills add brandonburrus/visualplan
 
 ### The CLI
 
+Requires Node.js 22.12.0 or newer.
+
 The skill renders plans with `vplan`, so install it too (the skill prompts for this if it is
 missing):
 

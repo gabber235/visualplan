@@ -37,7 +37,7 @@ const COMMON_EXPORT_CSS = `
  */
 const PDF_EXPORT_CSS = `
 .vp-compare, .vp-stat, .vp-chart, .vp-mermaid, .vp-math, .vp-callout,
-.vp-matrix-wrap, .vp-questions, .vp-checklist, .vp-filetree { break-inside: avoid; }
+.vp-matrix-wrap, .vp-questions, .vp-checklist, .vp-filetree, .vp-workspace { break-inside: avoid; }
 .vp-questions { box-shadow: none !important; }
 `
 

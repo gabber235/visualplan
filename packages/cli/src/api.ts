@@ -87,6 +87,8 @@ export {
   math,
   matrix,
   mermaid,
+  planWorkspace,
+  visual,
   phase,
   questions,
   stat,

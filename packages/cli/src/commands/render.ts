@@ -227,7 +227,12 @@ export async function runRender(file: string | undefined, options: RenderOptions
     source,
     goingToStdout ? undefined : snapshotKey(file, fromStdin),
   )
-  const html = await buildHtml(source, { theme, baseline, enableSharing })
+  const html = await buildHtml(source, {
+    theme,
+    baseline,
+    enableSharing,
+    sourcePath: snapshotKey(file, fromStdin),
+  })
 
   // Piped stdin with no explicit destination defaults to stdout, so the tool composes in a pipeline.
   if (goingToStdout) {
