@@ -257,7 +257,13 @@ export const SYSTEM_NODE_KIND_VALUES = [
  * of zod silently stripping it and the plan quietly losing content.
  */
 function strictObject<Shape extends z.ZodRawShape>(shape: Shape) {
-  const allowed = Object.keys(shape).join(', ')
+  // A legacy key (`z.never()` with a migration message) is declared only to explain its removal.
+  const allowed = Object.entries(shape)
+    .filter(
+      ([, field]) => !(field instanceof z.ZodOptional && field.unwrap() instanceof z.ZodNever),
+    )
+    .map(([key]) => key)
+    .join(', ')
   return z.strictObject(shape, {
     error: issue => {
       if (issue.code !== 'unrecognized_keys') return undefined
