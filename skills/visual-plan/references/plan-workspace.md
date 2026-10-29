@@ -6,7 +6,7 @@ Author one fenced `json` block inside `<PlanWorkspace>`, then optional `<Visual>
 
 Workspace
 
-- `vision?`: confirmed intent. Required when `decisions` is empty; a vision only workspace confirms intent before design.
+- `vision?`: confirmed intent. Required when `decisions` is empty.
 - `decisions?`: design choices, ordered by dependency.
 
 `vision`

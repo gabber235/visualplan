@@ -15,7 +15,7 @@ Use `PlanWorkspace` for software designs and stock components for other plans. R
 - Read the actual source first: behavior, callers, ownership, state, contracts, failure paths. Check relevant precedent against the implementation.
 - Challenge nearby boundaries for reuse, consolidation, expansion, and deletion. Ask before adopting a meaningful expansion.
 - Challenge expensive constraints, including user requirements, with a concrete simpler model. Keep the constraint unless the user agrees; a declined or ignored suggestion authorizes nothing.
-- Store agreed intent as the workspace `vision`. Render a vision only workspace to confirm intent before designing, then add decisions to the same source. Changing the vision reopens approval, so change it only when intent changes.
+- Store agreed intent as the workspace `vision`. Changing the vision reopens approval, so change it only when intent changes.
 - Split large plans into decisions ordered by dependency. Each shows current and proposed models in code first, then material tradeoffs, useful examples, and the change set. Make removals visible. End at the changes: no routes, evidence inventories, research diaries, or correction histories.
 - Make the first draft dense in concrete code: types, owned state, operation bodies, affected callers, consequential branches, failure handling. Mark proposed sketches as such. Trace each material behavioral claim through the shown code; include any helper body the proposal depends on.
 - Review before handoff is owned by the caller's planning workflow. Without one, check the proposal against the `AGENTS.md` instructions of every affected path. Keep unresolved decisions explicit.
