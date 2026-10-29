@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { WorkspaceModel } from './model.js'
+import { authoredModel, type WorkspaceModel } from './model.js'
 import { decisionReviewId, reviewItems, reviewRecordSchema } from './review-state.js'
 
 /** Older comments carried a kind chosen in the composer; it is read and ignored. */
@@ -60,7 +60,7 @@ export function emptyFeedback(): FeedbackState {
 
 /** Revision identifies the authored content captured by a feedback packet, not the storage slot. */
 export function workspaceRevision(model: WorkspaceModel): string {
-  return fingerprint(JSON.stringify(model))
+  return fingerprint(JSON.stringify(authoredModel(model)))
 }
 
 export function fingerprint(content: string): string {

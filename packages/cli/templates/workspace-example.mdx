@@ -3,6 +3,23 @@
 <PlanWorkspace>
 ```json
 {
+  "vision": {
+    "problem": "Each service applies its own rate limit, so quotas, rejection responses and outage behavior differ per service.",
+    "outcome": "The gateway admits or rejects every authenticated request with one policy, including while Redis is unavailable.",
+    "scope": [
+      { "id": "policy", "status": "in", "text": "One fixed window admission policy in the gateway" },
+      { "id": "outage", "status": "in", "text": "A bounded local counter while Redis is unavailable" },
+      { "id": "quotas", "status": "out", "text": "Per customer quota tiers" },
+      { "id": "service-limits", "status": "out", "text": "Removing service level limits in this change" }
+    ],
+    "facts": [
+      {
+        "id": "auth",
+        "claim": "Authentication runs before admission and supplies a hashed token identity.",
+        "source": "src/gateway/auth.ts: authenticate"
+      }
+    ]
+  },
   "decisions": [
     {
       "id": "admission",

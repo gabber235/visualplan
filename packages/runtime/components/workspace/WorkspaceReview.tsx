@@ -28,12 +28,14 @@ import {
   type ReviewSummary,
   reconcileReviews,
   reviewItems,
+  seedPlanBaseline,
   type ReviewItem,
   type ReviewStatus,
 } from './review-state.js'
 import type { WorkspaceModel } from './model.js'
 import { reconcileFeedback, snapshotTarget, targetChanged } from './feedback-targets.js'
 import { readSavedFeedback, writeSavedFeedback } from './review-storage.js'
+import { readPreviousRevision, revisionKey } from './RevisionChanges.js'
 import './feedback.css'
 
 interface ReviewActions {
@@ -66,11 +68,13 @@ async function loadFeedback(
       : emptyFeedback()
     const reconciled = reconcileFeedback(model, state)
     const revision = workspaceRevision(model)
+    // Read whichever way the concurrent revision write lands: both resolve the same earlier revision.
+    const previous = await readPreviousRevision(revisionKey(pathname), model)
     return {
       state: {
         ...reconciled,
         comments: reconciled.comments.filter(comment => (comment.sent ?? revision) === revision),
-        reviews: reconcileReviews(items, state.reviews),
+        reviews: reconcileReviews(items, seedPlanBaseline(state.reviews, previous)),
       },
       writable: true,
       warning: '',

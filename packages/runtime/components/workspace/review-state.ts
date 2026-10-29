@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { WorkspaceModel } from './model.js'
-import { codeRemovalPart } from './model.js'
+import { codeRemovalPart, scopeText } from './model.js'
 
 export const reviewStatusValues = ['unreviewed', 'accepted', 'denied'] as const
 export type ReviewStatus = (typeof reviewStatusValues)[number]
@@ -33,7 +33,7 @@ export type ReviewRecord = z.infer<typeof reviewRecordSchema>
 export interface ReviewItem {
   id: string
   label: string
-  kind: 'decision' | 'code' | 'group'
+  kind: 'plan' | 'decision' | 'code' | 'group'
   children: string[]
   snapshot: ReviewSnapshot
 }
@@ -64,14 +64,37 @@ function field(label: string, text: string | undefined, language?: string) {
   return { label, text: text ?? '', ...(language ? { language } : {}) }
 }
 
+/**
+ * The confirmed intent the plan approval rests on. Empty optional fields add no keys, so a vision
+ * without scope, facts, or principles keeps the snapshot it had before those fields existed.
+ */
+function visionSnapshot(model: WorkspaceModel): ReviewSnapshot {
+  const vision = model.vision
+  if (!vision) return model.thesis ? { thesis: field('Plan thesis', model.thesis) } : {}
+  const snapshot: ReviewSnapshot = {
+    problem: field('Current problem', vision.problem),
+    outcome: field('Intended outcome', vision.outcome),
+  }
+  if (vision.principles.length)
+    snapshot.principles = field('Design principles', [...vision.principles].sort().join('\n'))
+  for (const item of vision.scope)
+    snapshot[JSON.stringify(['scope', item.id])] = field('Scope', scopeText(item))
+  for (const fact of vision.facts)
+    snapshot[JSON.stringify(['fact', fact.id])] = field(
+      'Relies on',
+      `${fact.claim}\nSource: ${fact.source}`,
+    )
+  return snapshot
+}
+
 /** Review identity follows authored IDs; validity follows the displayed content and its meaning. */
 export function reviewItems(model: WorkspaceModel): Map<string, ReviewItem> {
   const items = new Map<string, ReviewItem>()
   items.set(planReviewId, {
     id: planReviewId,
-    label: 'Plan',
-    kind: 'group',
-    snapshot: {},
+    label: 'Plan vision',
+    kind: 'plan',
+    snapshot: visionSnapshot(model),
     children: model.decisions.map(decision => decisionReviewId(decision.id)),
   })
   for (const decision of model.decisions) {
@@ -313,8 +336,10 @@ export function summarizeReview(
   const ownInvalidated =
     item.kind !== 'group' && Boolean(record && (record.invalidated || !matchesReview(item, record)))
   const statuses = children.map(child => child.status)
+  // A plan or decision needs its own mark when it has nothing else to review or changed since.
   const requiresOwnMark =
-    item.kind === 'code' || (item.kind === 'decision' && (!children.length || ownInvalidated))
+    item.kind === 'code' ||
+    ((item.kind === 'decision' || item.kind === 'plan') && (!children.length || ownInvalidated))
   if (requiresOwnMark || ownStatus === 'denied') statuses.push(ownStatus)
   return {
     ownStatus,
@@ -332,7 +357,10 @@ export function summarizeReview(
   }
 }
 
-/** Decision actions fill only unreviewed descendants and cannot override a nested denial. */
+/**
+ * Decision actions fill only unreviewed descendants and cannot override a nested denial. A plan mark
+ * confirms only the vision: it never marks decisions, and a denied decision does not block it.
+ */
 export function markReview(
   id: string,
   status: ReviewStatus,
@@ -341,7 +369,11 @@ export function markReview(
 ): Record<string, ReviewRecord> {
   const item = items.get(id)
   if (!item || item.kind === 'group') throw new Error(`Unknown reviewable item: ${id}`)
-  if (status === 'accepted' && summarizeReview(id, items, reviews).deniedChildren > 0)
+  if (
+    item.kind !== 'plan' &&
+    status === 'accepted' &&
+    summarizeReview(id, items, reviews).deniedChildren > 0
+  )
     return reviews
   const next = { ...reviews, [id]: { status, snapshot: item.snapshot, invalidated: false } }
   if (item.kind === 'decision' && status !== 'unreviewed') {
@@ -379,18 +411,38 @@ function reviewChangedDecisions(
   }
 }
 
-/** Derived acceptance still needs a baseline to identify later changes to the decision itself. */
+/**
+ * Derived acceptance still needs a baseline to identify later changes to the decision itself, or to
+ * the vision of an accepted plan.
+ */
 function captureDecisionBaselines(
   items: Map<string, ReviewItem>,
   reviews: Record<string, ReviewRecord>,
 ) {
   for (const item of items.values()) {
-    if (item.kind !== 'decision' || !item.children.length || reviews[item.id]) continue
+    if (item.kind === 'code' || item.kind === 'group' || !item.children.length) continue
+    if (reviews[item.id]) continue
     if (summarizeReview(item.id, items, reviews).status === 'accepted') {
       reviews[item.id] = { status: 'unreviewed', snapshot: item.snapshot, invalidated: false }
     }
   }
   return reviews
+}
+
+/**
+ * Runtimes before the vision review stored no plan mark, so the first load would take the current
+ * vision as reviewed. When the plan was accepted in the revision the reader opened before, that
+ * revision's vision is the baseline instead, and an edited vision reopens the plan approval.
+ */
+export function seedPlanBaseline(
+  reviews: Record<string, ReviewRecord>,
+  previous: WorkspaceModel | undefined,
+): Record<string, ReviewRecord> {
+  if (reviews[planReviewId] || !previous) return reviews
+  const items = reviewItems(previous)
+  if (summarizeReview(planReviewId, items, reviews).status !== 'accepted') return reviews
+  const snapshot = items.get(planReviewId)!.snapshot
+  return { ...reviews, [planReviewId]: { status: 'unreviewed', snapshot, invalidated: false } }
 }
 
 /** Invalidation is persisted so reverting content cannot silently revive a dismissed approval. */

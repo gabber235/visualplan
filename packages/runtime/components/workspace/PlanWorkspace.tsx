@@ -9,8 +9,9 @@ import './workspace.css'
 import { WorkspaceReview, useWorkspaceReview } from './WorkspaceReview.js'
 import { reviewAnchor, workspaceRevision } from './feedback.js'
 import { collectCodeSlots } from './code-slots.js'
+import { PlanVision } from './PlanVision.js'
 import { ReviewStatusBadge } from './ReviewControls.js'
-import { decisionReviewId, planReviewId } from './review-state.js'
+import { decisionReviewId } from './review-state.js'
 import {
   RevisionChangesProvider,
   RevisionSummary,
@@ -50,11 +51,6 @@ function WorkspaceContent({ model, children }: { model: WorkspaceModel; children
   const [decisionId, setDecisionId] = useState(model.decisions[0]?.id ?? '')
   const decision =
     model.decisions.find(candidate => candidate.id === decisionId) ?? model.decisions[0]
-  const vision = model.vision ?? {
-    problem: model.thesis ?? '',
-    outcome: model.thesis ?? '',
-    principles: [],
-  }
 
   useEffect(() => {
     if (!model.decisions.some(candidate => candidate.id === decisionId)) {
@@ -69,69 +65,24 @@ function WorkspaceContent({ model, children }: { model: WorkspaceModel; children
   const markedCode = codeItems.filter(item => review.status(item.id) !== 'unreviewed').length
   const changedCode = codeItems.filter(item => review.state.reviews[item.id]?.invalidated).length
 
-  if (!decision) return null
-
   return (
     <>
       <div hidden aria-hidden='true'>
         {codeSlots.styles}
       </div>
-      {model.vision || model.thesis ? (
-        <header
-          data-status={review.status(planReviewId)}
-          className='vp-workspace__mast'
-          {...reviewAnchor('vision', 'Plan vision')}
-        >
-          <div className='vp-workspace__vision-copy'>
-            <div className='vp-workspace__vision-grid'>
-              <section {...reviewAnchor('vision:problem', 'Why this change matters')}>
-                <span className='vp-workspace__vision-label'>Current problem</span>
-                <strong {...changeMark(revision, changeKey('vision', 'problem'), vision.problem)}>
-                  {vision.problem}
-                </strong>
-              </section>
-              <section {...reviewAnchor('vision:outcome', 'Intended outcome')}>
-                <span className='vp-workspace__vision-label'>Intended outcome</span>
-                <strong {...changeMark(revision, changeKey('vision', 'outcome'), vision.outcome)}>
-                  {vision.outcome}
-                </strong>
-              </section>
-            </div>
-            {vision.principles.length > 0 ? (
-              <ul className='vp-workspace__principles' aria-label='Design principles'>
-                {vision.principles.map((principle, index) => (
-                  <li
-                    key={principle}
-                    {...reviewAnchor(`vision:principle:${index}`, 'Design principle')}
-                  >
-                    {principle}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        </header>
+      <PlanVision model={model} />
+      {decision ? (
+        <ReviewProgress
+          reviewed={reviewed}
+          total={model.decisions.length}
+          markedCode={markedCode}
+          codeBlocks={codeItems.length}
+          changedCode={changedCode}
+        />
       ) : null}
-      <div className='vp-review-progress'>
-        <div
-          className='vp-review-progress__track'
-          role='progressbar'
-          aria-label={`${reviewed} of ${model.decisions.length} decisions accepted`}
-          aria-valuemin={0}
-          aria-valuemax={model.decisions.length}
-          aria-valuenow={reviewed}
-        >
-          <span style={{ width: `${(reviewed / model.decisions.length) * 100}%` }} />
-        </div>
-        <p role='status'>
-          {reviewed} of {model.decisions.length} decisions accepted. {markedCode} of{' '}
-          {codeItems.length} blocks reviewed
-          {changedCode ? `, ${changedCode} changed since your review` : ''}.
-        </p>
-      </div>
       <RevisionSummary />
 
-      {model.decisions.length > 1 ? (
+      {decision && model.decisions.length > 1 ? (
         <nav className='vp-workspace__decisions' aria-label='Technical decisions'>
           {model.decisions.map((item, index) => (
             <button
@@ -153,34 +104,69 @@ function WorkspaceContent({ model, children }: { model: WorkspaceModel; children
         </nav>
       ) : null}
 
-      <div
-        className='vp-workspace__main'
-        {...reviewAnchor(`decision:${decision.id}`, `${decision.id}: ${decision.title}`)}
-      >
-        <DecisionWorkbench
-          decision={decision}
-          reviewStatus={review.status(decisionReviewId(decision.id))}
-          visuals={decision.visuals.map(visual => (
-            <div
-              key={visual.id}
-              {...reviewAnchor(`visual:${visual.id}`, visual.title)}
-              {...changeMark(revision, changeKey('decision', decision.id, 'visual', visual.id))}
-            >
-              {codeSlots.visuals.get(JSON.stringify([decision.id, visual.id]))}
-            </div>
-          ))}
+      {decision ? (
+        <div
+          className='vp-workspace__main'
+          {...reviewAnchor(`decision:${decision.id}`, `${decision.id}: ${decision.title}`)}
         >
-          <CodeContract
-            key={`${decision.id}:model`}
+          <DecisionWorkbench
             decision={decision}
-            codeBlocks={codeSlots.blocks}
-            role='model'
-          />
-        </DecisionWorkbench>
-        <DeveloperExperience decision={decision} codeBlocks={codeSlots.blocks} />
-        <CodeContract key={decision.id} decision={decision} codeBlocks={codeSlots.blocks} />
-      </div>
+            reviewStatus={review.status(decisionReviewId(decision.id))}
+            visuals={decision.visuals.map(visual => (
+              <div
+                key={visual.id}
+                {...reviewAnchor(`visual:${visual.id}`, visual.title)}
+                {...changeMark(revision, changeKey('decision', decision.id, 'visual', visual.id))}
+              >
+                {codeSlots.visuals.get(JSON.stringify([decision.id, visual.id]))}
+              </div>
+            ))}
+          >
+            <CodeContract
+              key={`${decision.id}:model`}
+              decision={decision}
+              codeBlocks={codeSlots.blocks}
+              role='model'
+            />
+          </DecisionWorkbench>
+          <DeveloperExperience decision={decision} codeBlocks={codeSlots.blocks} />
+          <CodeContract key={decision.id} decision={decision} codeBlocks={codeSlots.blocks} />
+        </div>
+      ) : null}
     </>
+  )
+}
+
+function ReviewProgress({
+  reviewed,
+  total,
+  markedCode,
+  codeBlocks,
+  changedCode,
+}: {
+  reviewed: number
+  total: number
+  markedCode: number
+  codeBlocks: number
+  changedCode: number
+}) {
+  return (
+    <div className='vp-review-progress'>
+      <div
+        className='vp-review-progress__track'
+        role='progressbar'
+        aria-label={`${reviewed} of ${total} decisions accepted`}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={reviewed}
+      >
+        <span style={{ width: `${(reviewed / total) * 100}%` }} />
+      </div>
+      <p role='status'>
+        {reviewed} of {total} decisions accepted. {markedCode} of {codeBlocks} blocks reviewed
+        {changedCode ? `, ${changedCode} changed since your review` : ''}.
+      </p>
+    </div>
   )
 }
 

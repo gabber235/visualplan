@@ -28,10 +28,13 @@ export function ReviewControls({ itemId, label }: { itemId: string; label?: stri
   const [showChanges, setShowChanges] = useState(false)
   if (!item) throw new Error(`Unknown review item: ${itemId}`)
   const { status, ownStatus, deniedChildren, ownInvalidated } = review.summary(itemId)
-  const undoAccept = ownStatus === 'accepted' && status !== 'unreviewed'
+  // A plan mark confirms only the vision, so it can be undone while decisions are still open.
+  const undoAccept = ownStatus === 'accepted' && (item.kind === 'plan' || status !== 'unreviewed')
   const automaticallyAccepted = status === 'accepted' && ownStatus !== 'accepted'
   const record = review.state.reviews[itemId]
   const changed = ownInvalidated
+  // Confirming the vision is independent of the decisions, so a denied decision never blocks it.
+  const blocked = item.kind !== 'plan' && deniedChildren > 0
 
   return (
     <div className='vp-item-review' data-review-ui='true' data-status={status}>
@@ -52,8 +55,8 @@ export function ReviewControls({ itemId, label }: { itemId: string; label?: stri
           <button
             type='button'
             data-action='accept'
-            aria-pressed={status === 'accepted'}
-            disabled={automaticallyAccepted || (deniedChildren > 0 && !undoAccept)}
+            aria-pressed={status === 'accepted' || undoAccept}
+            disabled={automaticallyAccepted || (blocked && !undoAccept)}
             aria-label={`${automaticallyAccepted ? 'Accepted' : undoAccept ? 'Undo accept' : 'Accept'} ${item.label}`}
             onClick={() => review.setStatus(itemId, undoAccept ? 'unreviewed' : 'accepted')}
           >
@@ -61,7 +64,7 @@ export function ReviewControls({ itemId, label }: { itemId: string; label?: stri
           </button>
         </fieldset>
       </div>
-      {deniedChildren > 0 ? (
+      {blocked ? (
         <p className='vp-item-review__blocked' role='status'>
           {deniedChildren} nested {deniedChildren === 1 ? 'item is' : 'items are'} denied. Resolve
           {deniedChildren === 1 ? ' it' : ' them'} before accepting this decision.

@@ -101,48 +101,135 @@
 }
 .vp-workspace__mast > div:first-child {
   display: grid;
-  gap: 20px;
+  gap: 12px;
   min-width: 0;
   flex: 1;
 }
+/* Each part of the vision is a small labeled block, so structure carries the reading order. */
 .vp-workspace__vision-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
-  gap: 32px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
-.vp-workspace__vision-grid section {
+.vp-workspace__vision-block {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--vp-border);
+  border-radius: 8px;
+  background: var(--vp-surface);
 }
 .vp-workspace__vision-label {
   color: var(--vp-muted);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
-.vp-workspace__vision-grid strong {
-  font-size: 17px;
-  font-weight: 450;
+.vp-main .vp-workspace .vp-workspace__vision-block > p {
+  max-width: 60ch;
+  color: var(--vp-text);
+  font-size: 15px;
   line-height: 1.55;
-  max-width: 68ch;
 }
-.vp-workspace__vision-grid section:last-child strong {
-  font-size: 23px;
+.vp-workspace__vision-block[data-kind="outcome"] {
+  border-color: var(--vp-tip-border);
+  border-left: 3px solid var(--vp-done);
+  background: var(--vp-tip-tint);
+}
+.vp-workspace__vision-block[data-kind="outcome"] .vp-workspace__vision-label {
+  color: var(--vp-done);
+}
+.vp-main .vp-workspace .vp-workspace__vision-block[data-kind="outcome"] > p {
+  font-size: 16px;
   font-weight: 550;
-  line-height: 1.4;
-  letter-spacing: -0.02em;
+  line-height: 1.5;
 }
 .vp-workspace__principles {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 20px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 .vp-workspace__principles li {
+  padding: 2px 10px;
+  border: 1px solid var(--vp-border);
+  border-radius: 999px;
   color: var(--vp-muted);
   font-size: 13px;
+}
+.vp-workspace__scope-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 24px;
+}
+.vp-workspace__scope {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+}
+.vp-workspace__scope-badge {
+  padding: 1px 8px;
+  border: 1px solid var(--vp-tip-border);
+  border-radius: 999px;
+  background: var(--vp-tip-tint);
+  color: var(--vp-done);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.vp-workspace__scope[data-scope="out"] .vp-workspace__scope-badge {
+  border-color: var(--vp-border-strong);
+  background: transparent;
+  color: var(--vp-muted);
+}
+.vp-workspace__scope ul,
+.vp-workspace__facts ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.vp-workspace__scope li,
+.vp-workspace__facts li {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.vp-workspace__scope[data-scope="out"] li {
+  color: var(--vp-muted);
+}
+.vp-workspace__facts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding: 4px 0;
+}
+.vp-workspace__facts li + li {
+  border-top: 1px solid var(--vp-border);
+}
+.vp-workspace__facts cite {
+  color: var(--vp-muted);
+  font-family: var(--vp-mono);
+  font-size: 12px;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+.vp-workspace__fact-full {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 .vp-workspace__decisions {
   display: grid;
@@ -188,7 +275,7 @@
   color: var(--vp-risk);
   background: var(--vp-risk-tint);
 }
-.vp-workspace__decisions button strong {
+.vp-workspace__decisions strong {
   overflow-wrap: break-word;
   font-size: 14px;
   font-weight: 550;
@@ -598,10 +685,8 @@
     gap: 14px;
     padding-bottom: 18px;
   }
-  .vp-workspace__mast strong {
-    font-size: 17px;
-  }
-  .vp-workspace__vision-grid {
+  .vp-workspace__vision-grid,
+  .vp-workspace__scope-grid {
     grid-template-columns: 1fr;
   }
   .vp-workspace__decisions {
@@ -622,9 +707,6 @@
   }
   .vp-developer-experience__body {
     grid-template-columns: 1fr;
-  }
-  .vp-workspace__vision-grid section:last-child strong {
-    font-size: 21px;
   }
   .vp-change-review__toolbar {
     top: 6px;

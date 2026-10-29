@@ -518,19 +518,18 @@ function parsePlanWorkspace(node: MdNode, source?: string): BlockResult {
     }
   }
   const { visuals, issues: visualIssues } = workspaceVisuals(node, source)
-  if (
-    value &&
-    typeof value === 'object' &&
-    Array.isArray((value as { decisions?: unknown }).decisions)
-  ) {
-    for (const decision of (value as { decisions: { id?: unknown; visuals?: unknown[] }[] })
-      .decisions) {
+  if (value && typeof value === 'object') {
+    // An intent only plan may omit decisions; its Visuals then name unknown decisions.
+    const authored = (value as { decisions?: unknown }).decisions
+    const decisions = (Array.isArray(authored) ? authored : []) as {
+      id?: unknown
+      visuals?: unknown[]
+    }[]
+    for (const decision of decisions) {
       const own = visuals.filter(visual => visual.decision === decision.id)
       if (own.length) decision.visuals = own.map(({ id, title, source }) => ({ id, title, source }))
     }
-    const ids = new Set(
-      (value as { decisions: { id?: unknown }[] }).decisions.map(decision => decision.id),
-    )
+    const ids = new Set(decisions.map(decision => decision.id))
     for (const visual of visuals.filter(item => !ids.has(item.decision)))
       visualIssues.push({
         ...pos(node),

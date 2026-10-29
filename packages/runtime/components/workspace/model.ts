@@ -2,6 +2,32 @@ import type { PlanWorkspaceModel } from '@visualplan/core'
 
 export type WorkspaceModel = PlanWorkspaceModel
 export type WorkspaceDecision = WorkspaceModel['decisions'][number]
+export type WorkspaceVision = NonNullable<WorkspaceModel['vision']>
+
+/**
+ * The vision as authored. Scope and facts default to empty, and leaving the empty defaults out keeps
+ * the revision hash and comment fingerprints of plans written before those fields existed.
+ */
+export function authoredVision(vision: WorkspaceVision) {
+  const { scope, facts, ...rest } = vision
+  return {
+    ...rest,
+    ...(scope.length ? { scope } : {}),
+    ...(facts.length ? { facts } : {}),
+  }
+}
+
+type ScopeItem = WorkspaceVision['scope'][number]
+
+/** A scope item as the reader sees it, side included, so moving it reads as a change. */
+export function scopeText(item: ScopeItem): string {
+  return `${item.status === 'in' ? 'In scope' : 'Out of scope'}: ${item.text}`
+}
+
+/** The model as authored, for hashing. */
+export function authoredModel(model: WorkspaceModel) {
+  return model.vision ? { ...model, vision: authoredVision(model.vision) } : model
+}
 
 /** Collapse only complete removals. Mixed edits must keep their proposed behavior visible. */
 export function codeRemovalPart(

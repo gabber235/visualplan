@@ -1,4 +1,4 @@
-import type { WorkspaceModel } from './model.js'
+import { authoredVision, type WorkspaceModel } from './model.js'
 import {
   fingerprint,
   workspaceRevision,
@@ -27,6 +27,26 @@ function content(value: unknown): Content | undefined {
   return { snapshot: stable(value), ...(typeof value === 'string' ? { text: value } : {}) }
 }
 
+type VisionKind = 'scope' | 'fact'
+
+/** The commentable vision items of one kind, each with the value its comments are tied to. */
+function visionEntries(model: WorkspaceModel, kind: VisionKind) {
+  const vision = model.vision
+  if (!vision) return []
+  if (kind === 'fact')
+    return vision.facts.map(fact => ({
+      id: fact.id,
+      value: { claim: fact.claim, source: fact.source },
+    }))
+  // Scope comments follow the text, so moving an item between in and out keeps them.
+  return vision.scope.map(item => ({ id: item.id, value: item.text }))
+}
+
+function visionAnchor(part: string | undefined): { kind: VisionKind; id: string } | undefined {
+  const match = /^vision:(scope|fact):(.+)$/.exec(part ?? '')
+  return match ? { kind: match[1] as VisionKind, id: match[2]! } : undefined
+}
+
 function relocate(model: WorkspaceModel, target: FeedbackTarget): FeedbackTarget {
   if (!target.fingerprint) return target
   const decision = model.decisions.find(
@@ -35,6 +55,14 @@ function relocate(model: WorkspaceModel, target: FeedbackTarget): FeedbackTarget
   const codeId = target.path.find(item => item.startsWith('code:'))?.slice(5)
   const code = decision?.code.find(item => item.id === codeId)
   const path = target.path.map(part => {
+    const anchor = visionAnchor(part)
+    if (anchor) {
+      // A renamed id keeps its comments when exactly one item still has the commented content.
+      const matches = visionEntries(model, anchor.kind).filter(
+        entry => fingerprint(stable(entry.value)) === target.fingerprint,
+      )
+      return matches.length === 1 ? `vision:${anchor.kind}:${matches[0]!.id}` : part
+    }
     if (code && (part === 'changes' || part === 'model'))
       return code.role === 'model' ? 'model' : 'changes'
     const kind = part.startsWith('vision:principle:') ? 'vision:principle' : part.split(':')[0]
@@ -64,7 +92,11 @@ function relocate(model: WorkspaceModel, target: FeedbackTarget): FeedbackTarget
 function resolve(model: WorkspaceModel, target: FeedbackTarget): Content | null | undefined {
   const leaf = target.path.at(-1)
   if (target.path[0] === 'vision') {
-    if (leaf === 'vision') return content(model.vision ?? model.thesis)
+    if (leaf === 'vision')
+      return content(model.vision ? authoredVision(model.vision) : model.thesis)
+    const anchor = visionAnchor(leaf)
+    if (anchor)
+      return content(visionEntries(model, anchor.kind).find(entry => entry.id === anchor.id)?.value)
     if (leaf === 'vision:problem') return content(model.vision?.problem ?? model.thesis)
     if (leaf === 'vision:outcome') return content(model.vision?.outcome ?? model.thesis)
     if (leaf?.startsWith('vision:principle:'))

@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { planWorkspaceSchema } from '@visualplan/core'
 import { PlanWorkspace } from '../components/workspace/PlanWorkspace.js'
 import { emptyFeedback, feedbackKey } from '../components/workspace/feedback.js'
+import { workspaceRevision } from '../components/workspace/feedback.js'
+import { revisionKey } from '../components/workspace/RevisionChanges.js'
 import { codeReviewId, markReview, reviewItems } from '../components/workspace/review-state.js'
 import { readSavedFeedback, writeSavedFeedback } from '../components/workspace/review-storage.js'
 
@@ -128,6 +130,40 @@ describe('Review persistence through the rendered workspace', () => {
     await settled()
     expect(status()).toBe('Changed')
     expect(container.querySelector('[role="alert"]')).toBeNull()
+  })
+
+  it('reopens a plan approved by an older runtime when its vision was edited since', async () => {
+    const approved = planWorkspaceSchema.parse({
+      ...model,
+      vision: { problem: 'Two writers', outcome: 'One writer' },
+    })
+    // What an older runtime saved: decision and code marks, and the revision it last opened.
+    const state = emptyFeedback()
+    for (const [id, item] of reviewItems(approved))
+      if (item.kind === 'decision' || item.kind === 'code')
+        state.reviews[id] = { status: 'accepted', snapshot: item.snapshot, invalidated: false }
+    await writeSavedFeedback(key, JSON.stringify(state))
+    await writeSavedFeedback(
+      revisionKey(location.pathname),
+      JSON.stringify({ current: { revision: workspaceRevision(approved), model: approved } }),
+    )
+    const edited = planWorkspaceSchema.parse({
+      ...model,
+      vision: {
+        problem: 'Three writers',
+        outcome: 'One writer',
+        scope: [{ id: 'cli', text: 'CLI writes', status: 'in' }],
+      },
+    })
+    await act(async () => root.render(<PlanWorkspace model={edited} />))
+    await settled()
+    const mast = container.querySelector<HTMLElement>('.vp-workspace__mast')!
+    expect(mast.dataset.status).toBe('unreviewed')
+    expect(mast.querySelector('[aria-label="Plan vision review"]')).not.toBeNull()
+    expect(container.querySelector<HTMLElement>('.vp-decision-workbench')?.dataset.status).toBe(
+      'accepted',
+    )
+    expect(status()).toBe('Accepted')
   })
 
   it('shows a save failure, provides a complete backup, and saves the same approval on retry', async () => {

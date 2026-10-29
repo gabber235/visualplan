@@ -20,6 +20,8 @@ import {
   changedWithin,
   diffRevisions,
   lineHunks,
+  removedDecisionsOwner,
+  visionOwner,
   type FieldChange,
   type LineHunk,
   type RemovedItem,
@@ -32,6 +34,32 @@ const baselineSchema = z.object({ current: snapshotSchema, previous: snapshotSch
 const savedReviewsSchema = z.object({ reviews: z.record(z.string(), reviewRecordSchema) })
 const highlightPreference = 'vp-revision-highlights'
 
+export function revisionKey(pathname: string): string {
+  return `vp-revision:${pathname}`
+}
+
+async function storedRevisions(key: string, model: WorkspaceModel) {
+  const revision = workspaceRevision(model)
+  const parsed = baselineSchema.safeParse(JSON.parse((await readSavedFeedback(key, key)) ?? 'null'))
+  const stored = parsed.success ? parsed.data : undefined
+  const previous = stored?.current.revision === revision ? stored.previous : stored?.current
+  const result = previous && planWorkspaceSchema.safeParse(previous.model)
+  return {
+    revision,
+    stored,
+    previous,
+    model: result?.success ? result.data : undefined,
+  }
+}
+
+/** The revision this browser opened before the current one, without recording the current one. */
+export async function readPreviousRevision(
+  key: string,
+  model: WorkspaceModel,
+): Promise<WorkspaceModel | undefined> {
+  return (await storedRevisions(key, model)).model
+}
+
 /**
  * The baseline is the revision this browser opened before the current one, so agent renders the
  * reader never saw cannot hide changes, and reloading the current revision keeps its highlights.
@@ -40,15 +68,10 @@ export async function loadPreviousRevision(
   key: string,
   model: WorkspaceModel,
 ): Promise<WorkspaceModel | undefined> {
-  const revision = workspaceRevision(model)
-  const parsed = baselineSchema.safeParse(JSON.parse((await readSavedFeedback(key, key)) ?? 'null'))
-  const stored = parsed.success ? parsed.data : undefined
-  const previous = stored?.current.revision === revision ? stored.previous : stored?.current
+  const { revision, stored, previous, model: result } = await storedRevisions(key, model)
   if (stored?.current.revision !== revision)
     await writeSavedFeedback(key, JSON.stringify({ current: { revision, model }, previous }))
-  if (!previous) return undefined
-  const result = planWorkspaceSchema.safeParse(previous.model)
-  return result.success ? result.data : undefined
+  return result
 }
 
 /** Without an earlier opened revision, the saved review marks show what the reader last reviewed. */
@@ -67,7 +90,7 @@ async function loadBaseline(
   pathname: string,
   model: WorkspaceModel,
 ): Promise<Baseline | undefined> {
-  const opened = await loadPreviousRevision(`vp-revision:${pathname}`, model)
+  const opened = await loadPreviousRevision(revisionKey(pathname), model)
   if (opened) return { model: opened, since: 'the revision you last opened' }
   const reviewed = await loadReviewedRevision(pathname, model)
   return reviewed && { model: reviewed, since: 'your last review' }
@@ -380,30 +403,51 @@ export function RemovedItems({ items }: { items: RemovedItem[] }) {
   )
 }
 
+function plural(count: number, noun: string): string {
+  return `${count} ${count === 1 ? noun : `${noun}s`}`
+}
+
+/**
+ * What changed, counted per owner: vision changes name the vision instead of counting as a
+ * decision, and removed decisions are reported once instead of as changed places.
+ */
+export function revisionSummaryText(changes: RevisionChanges): string {
+  const vision = changes.counts.get(visionOwner) ?? 0
+  const decisionCounts = [...changes.counts]
+    .filter(([owner]) => owner !== visionOwner)
+    .map(([, value]) => value)
+  const decisions = decisionCounts.filter(value => value > 0).length
+  const places = vision + decisionCounts.reduce((sum, value) => sum + value, 0)
+  const removed = changes.removed.get(removedDecisionsOwner)?.length ?? 0
+  const where = [
+    ...(vision ? ['the vision'] : []),
+    ...(decisions ? [plural(decisions, 'decision')] : []),
+  ].join(' and ')
+  return [
+    ...(places ? [`${plural(places, 'place')} changed in ${where}`] : []),
+    ...(removed ? [`${plural(removed, 'decision')} removed`] : []),
+  ].join(', ')
+}
+
 /** The plan level line that says how much changed and lets the reader hide the highlights. */
 export function RevisionSummary() {
   const revision = useRevisionChanges()
   const changes = revision.changes
   if (!changes) return null
-  const places = [...changes.counts.values()].reduce((sum, value) => sum + value, 0)
-  const decisions = [...changes.counts.values()].filter(value => value > 0).length
-  const removedDecisions = changes.removed.get('')?.length ?? 0
-  if (!places && !removedDecisions) return null
+  const text = revisionSummaryText(changes)
+  if (!text) return null
   return (
     <div className='vp-revision-summary' data-review-ui='true'>
       <span className='vp-revision-summary__dot' aria-hidden='true' />
       <p>
-        Since {revision.since}: {places} {places === 1 ? 'place' : 'places'} changed in {decisions}{' '}
-        {decisions === 1 ? 'decision' : 'decisions'}
-        {removedDecisions
-          ? `, ${removedDecisions} ${removedDecisions === 1 ? 'decision' : 'decisions'} removed`
-          : ''}
-        . Hover a highlight to see what it was.
+        Since {revision.since}: {text}. Hover a highlight to see what it was.
       </p>
       <button type='button' onClick={() => revision.setVisible(!revision.visible)}>
         {revision.visible ? 'Hide highlights' : 'Show highlights'}
       </button>
-      {revision.visible ? <RemovedItems items={changes.removed.get('') ?? []} /> : null}
+      {revision.visible ? (
+        <RemovedItems items={changes.removed.get(removedDecisionsOwner) ?? []} />
+      ) : null}
     </div>
   )
 }

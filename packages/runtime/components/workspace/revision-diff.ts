@@ -1,4 +1,4 @@
-import type { WorkspaceDecision, WorkspaceModel } from './model.js'
+import { scopeText, type WorkspaceDecision, type WorkspaceModel } from './model.js'
 import { reviewLineDiff } from './review-state.js'
 
 export type ChangeKind = 'added' | 'modified'
@@ -21,11 +21,19 @@ export interface RemovedItem {
 export interface RevisionChanges {
   /** Field and item changes keyed by `changeKey` paths. */
   fields: Map<string, FieldChange>
-  /** Removed children per decision id; removed decisions use the empty id. */
+  /**
+   * Removed children per owner: a decision id, `visionOwner` for vision items, or
+   * `removedDecisionsOwner` for whole decisions that are gone.
+   */
   removed: Map<string, RemovedItem[]>
-  /** Number of changed places per surviving or new decision. */
+  /** Number of changed places per owner: each surviving or new decision, and `visionOwner`. */
   counts: Map<string, number>
 }
+
+/** Owner of vision changes. Decision ids are never JSON arrays, so this cannot collide. */
+export const visionOwner = JSON.stringify(['vision'])
+/** Owner of removed decisions. Decision ids are never empty. */
+export const removedDecisionsOwner = ''
 
 export function changeKey(...parts: string[]): string {
   return JSON.stringify(parts)
@@ -35,6 +43,15 @@ type Card = { id?: string; title: string; detail?: string }
 
 function cardText(card: Card): string {
   return card.detail ? `${card.title}\n${card.detail}` : card.title
+}
+
+/** Scope items and facts diff like reasoning cards; facts read as their claim then source. */
+function scopeCards(items: NonNullable<WorkspaceModel['vision']>['scope']): Card[] {
+  return items.map(item => ({ id: item.id, title: scopeText(item) }))
+}
+
+function factCards(facts: { id: string; claim: string; source: string }[]): Card[] {
+  return facts.map(fact => ({ id: fact.id, title: fact.claim, detail: fact.source }))
 }
 
 function ownershipText(row: WorkspaceDecision['ownership'][number]): string {
@@ -78,7 +95,7 @@ export function diffRevisions(previous: WorkspaceModel, current: WorkspaceModel)
   const fields = new Map<string, FieldChange>()
   const removed = new Map<string, RemovedItem[]>()
   const counts = new Map<string, number>()
-  let owner = ''
+  let owner = visionOwner
   const count = () => counts.set(owner, (counts.get(owner) ?? 0) + 1)
   const remove = (item: RemovedItem) => {
     removed.set(owner, [...(removed.get(owner) ?? []), item])
@@ -96,6 +113,30 @@ export function diffRevisions(previous: WorkspaceModel, current: WorkspaceModel)
 
   compare(changeKey('vision', 'problem'), previous.vision?.problem, current.vision?.problem)
   compare(changeKey('vision', 'outcome'), previous.vision?.outcome, current.vision?.outcome)
+  const scope = pairCards(
+    scopeCards(previous.vision?.scope ?? []),
+    scopeCards(current.vision?.scope ?? []),
+  )
+  for (const { card, id, old } of scope.pairs) {
+    if (!old) added(changeKey('vision', 'scope', id))
+    else compare(changeKey('vision', 'scope', id), cardText(old), cardText(card))
+  }
+  for (const { card, id } of scope.removed)
+    remove({ key: changeKey('vision', 'scope', id), label: card.title, previous: card.title })
+  const facts = pairCards(
+    factCards(previous.vision?.facts ?? []),
+    factCards(current.vision?.facts ?? []),
+  )
+  for (const { card, id, old } of facts.pairs) {
+    if (!old) added(changeKey('vision', 'fact', id))
+    else compare(changeKey('vision', 'fact', id), cardText(old), cardText(card))
+  }
+  for (const { card, id } of facts.removed)
+    remove({
+      key: changeKey('vision', 'fact', id),
+      label: `Relies on: ${card.title}`,
+      previous: cardText(card),
+    })
 
   const decisions = matchById(previous.decisions, decision => decision.id)
   for (const decision of current.decisions) {
@@ -203,14 +244,15 @@ export function diffRevisions(previous: WorkspaceModel, current: WorkspaceModel)
         language: entry.language,
       })
   }
-  owner = ''
-  for (const decision of decisions.values())
-    if (!current.decisions.some(item => item.id === decision.id))
-      remove({
-        key: changeKey('decision', decision.id),
-        label: decision.title,
-        previous: decision.goal ?? decision.title,
-      })
+  // A removed decision is reported on its own, not as a changed place in some decision.
+  const removedDecisions = [...decisions.values()]
+    .filter(decision => !current.decisions.some(item => item.id === decision.id))
+    .map(decision => ({
+      key: changeKey('decision', decision.id),
+      label: decision.title,
+      previous: decision.goal ?? decision.title,
+    }))
+  if (removedDecisions.length) removed.set(removedDecisionsOwner, removedDecisions)
   return { fields, removed, counts }
 }
 

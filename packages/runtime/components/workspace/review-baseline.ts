@@ -3,6 +3,7 @@ import {
   codeReviewId,
   decisionReviewId,
   exampleReviewId,
+  planReviewId,
   type ReviewRecord,
   type ReviewSnapshot,
 } from './review-state.js'
@@ -171,6 +172,37 @@ function reviewedDecision(
   }
 }
 
+/** The vision the reader confirmed, from the plan mark. Without one, the vision counts as unchanged. */
+function reviewedVision(
+  vision: WorkspaceModel['vision'],
+  reviews: Record<string, ReviewRecord>,
+): WorkspaceModel['vision'] {
+  const snapshot = reviews[planReviewId]?.snapshot
+  if (!vision || !snapshot || !('problem' in snapshot)) return vision
+  const items = (kind: 'scope' | 'fact') =>
+    Object.entries(snapshot).flatMap(([key, value]) => {
+      const path = key.startsWith('[') ? parseJson(key) : undefined
+      return Array.isArray(path) && path[0] === kind && typeof path[1] === 'string'
+        ? [{ id: path[1], text: value.text }]
+        : []
+    })
+  return {
+    ...vision,
+    problem: recorded(snapshot, 'problem') ?? vision.problem,
+    outcome: recorded(snapshot, 'outcome') ?? vision.outcome,
+    scope: items('scope').map(({ id, text }) => {
+      const out = text.startsWith('Out of scope: ')
+      return { id, status: out ? 'out' : 'in', text: text.replace(/^(In|Out of) scope: /, '') }
+    }),
+    facts: items('fact').map(({ id, text }) => {
+      const split = text.lastIndexOf('\nSource: ')
+      return split < 0
+        ? { id, claim: text, source: '' }
+        : { id, claim: text.slice(0, split), source: text.slice(split + 9) }
+    }),
+  }
+}
+
 /**
  * What the reader last reviewed, rebuilt from saved review marks. Plans first opened before the
  * browser kept whole revisions have only these marks, so changes since review are still visible.
@@ -183,6 +215,7 @@ export function reviewedRevision(
   if (!Object.keys(reviews).length) return undefined
   return {
     ...model,
+    vision: reviewedVision(model.vision, reviews),
     decisions: model.decisions.map(decision => reviewedDecision(decision, reviews)),
   }
 }

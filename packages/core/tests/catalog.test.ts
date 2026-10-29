@@ -390,3 +390,118 @@ describe('Concise code model comparisons', () => {
     ).toBe(false)
   })
 })
+
+describe('Plan vision', () => {
+  const vision = { problem: 'Services limit differently', outcome: 'One admission policy' }
+  const decision = { id: 'D1', title: 'One owner' }
+
+  it('defaults scope and facts so existing plans keep their shape (golden)', () => {
+    const parsed = planWorkspaceSchema.parse({ vision, decisions: [decision] })
+    expect(parsed.vision).toEqual({
+      ...vision,
+      principles: [],
+      scope: [],
+      facts: [],
+    })
+    expect(Object.keys(parsed.vision!)).toEqual([
+      'problem',
+      'outcome',
+      'principles',
+      'scope',
+      'facts',
+    ])
+  })
+
+  it('accepts an intent only plan without decisions (golden)', () => {
+    const parsed = planWorkspaceSchema.parse({
+      vision: {
+        ...vision,
+        scope: [{ id: 'policy', text: 'Gateway policy', status: 'in' }],
+        facts: [{ id: 'auth', claim: 'Auth runs first', source: 'src/auth.ts' }],
+      },
+    })
+    expect(parsed.decisions).toEqual([])
+    expect(parsed.vision?.scope).toEqual([{ id: 'policy', text: 'Gateway policy', status: 'in' }])
+  })
+
+  it('requires a vision when there are no decisions (error)', () => {
+    expect(planWorkspaceSchema.safeParse({ decisions: [] }).success).toBe(false)
+    expect(planWorkspaceSchema.safeParse({ thesis: 'Only a thesis' }).success).toBe(false)
+  })
+
+  it('rejects duplicate ids across scope and facts (error)', () => {
+    const result = planWorkspaceSchema.safeParse({
+      vision: {
+        ...vision,
+        scope: [
+          { id: 'same', text: 'A', status: 'in' },
+          { id: 'other', text: 'B', status: 'out' },
+        ],
+        facts: [{ id: 'same', claim: 'C', source: 'D' }],
+      },
+    })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0]?.message).toMatch(/unique across the vision/)
+  })
+
+  it('rejects ids with a colon and items missing required fields (edge)', () => {
+    const parse = (value: unknown) =>
+      planWorkspaceSchema.safeParse({ vision: { ...vision, ...(value as object) } }).success
+    expect(parse({ scope: [{ id: 'a:b', text: 'A', status: 'in' }] })).toBe(false)
+    expect(parse({ scope: [{ text: 'A', status: 'in' }] })).toBe(false)
+    expect(parse({ scope: [{ id: 'a', text: 'A' }] })).toBe(false)
+    expect(parse({ scope: [{ id: 'a', text: 'A', status: 'both' }] })).toBe(false)
+    expect(parse({ facts: [{ id: 'f', claim: 'C' }] })).toBe(false)
+    expect(parse({ facts: [{ id: 'f:1', claim: 'C', source: 'S' }] })).toBe(false)
+  })
+})
+
+describe('PlanWorkspace unknown keys', () => {
+  const vision = { problem: 'Edits race', outcome: 'One writer' }
+  const code = { id: 'owner', file: 'editor.ts', symbol: 'Editor', proposed: 'interface Editor {}' }
+  const example = { id: 'save', title: 'Save', language: 'ts', code: 'editor.save()' }
+  const decision = { id: 'D1', title: 'One writer', code: [code], examples: [example] }
+  const issues = (model: unknown) => {
+    const result = planWorkspaceSchema.safeParse(model)
+    expect(result.success).toBe(false)
+    return result.error?.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`) ?? []
+  }
+
+  it('accepts the same model without the unknown key (golden)', () => {
+    expect(planWorkspaceSchema.safeParse({ vision, decisions: [decision] }).success).toBe(true)
+  })
+
+  it.each([
+    ['plan', { vision, decisions: [decision], decisons: [] }, '', 'decisons'],
+    ['vision', { vision: { ...vision, outcomes: 'x' } }, 'vision', 'outcomes'],
+    ['decision', { decisions: [{ ...decision, sumary: 'x' }] }, 'decisions.0', 'sumary'],
+    [
+      'code entry',
+      { decisions: [{ ...decision, code: [{ ...code, before: 'x' }] }] },
+      'decisions.0.code.0',
+      'before',
+    ],
+    [
+      'example',
+      { decisions: [{ ...decision, examples: [{ ...example, output: 'x' }] }] },
+      'decisions.0.examples.0',
+      'output',
+    ],
+  ])('rejects an unknown key at %s level and names it (error)', (_, model, path, key) => {
+    const [issue] = issues(model)
+    expect(issue).toContain(`${path}: unknown key "${key}"`)
+    expect(issue).toContain('allowed keys here:')
+  })
+
+  it('lists the allowed keys but not removed legacy keys (edge)', () => {
+    const [issue] = issues({ decisions: [{ ...decision, sumary: 'x' }] })
+    expect(issue).toContain('summary')
+    expect(issue).not.toContain('flows')
+  })
+
+  it('keeps the migration message for a removed legacy key (edge)', () => {
+    expect(issues({ decisions: [{ ...decision, flows: [] }] })).toEqual([
+      'decisions.0.flows: Code paths were replaced by developer examples. Author examples instead of flows.',
+    ])
+  })
+})
