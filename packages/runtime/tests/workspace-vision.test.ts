@@ -173,18 +173,6 @@ describe('Plan approval follows the confirmed vision', () => {
     )
   })
 
-  it('makes an intent only plan reviewable through its vision', () => {
-    const intent = planWorkspaceSchema.parse({ vision: scoped.vision })
-    const items = reviewItems(intent)
-    expect(items.get(planReviewId)?.children).toEqual([])
-    expect(summarizeReview(planReviewId, items, {}).status).toBe('unreviewed')
-    expect(summarizeReview(planReviewId, items, {}).unreviewedItems).toBe(1)
-    const accepted = markReview(planReviewId, 'accepted', items, {})
-    expect(summarizeReview(planReviewId, items, accepted).status).toBe('accepted')
-    const denied = markReview(planReviewId, 'denied', items, {})
-    expect(summarizeReview(planReviewId, items, denied).status).toBe('denied')
-  })
-
   it('confirms the vision without marking decisions or being blocked by a denial', () => {
     const items = reviewItems(scoped)
     const denied = markReview(decisionReviewId('D1'), 'denied', items, {})
@@ -272,12 +260,15 @@ describe('Revision summary counts', () => {
 
   it('reports removed decisions once without inflating changed places or decisions', () => {
     const changes = diffRevisions(
-      legacy,
-      planWorkspaceSchema.parse({ ...legacyJson, decisions: [] }),
+      planWorkspaceSchema.parse({
+        ...legacyJson,
+        decisions: [...legacyJson.decisions, decision('D3')],
+      }),
+      planWorkspaceSchema.parse({ ...legacyJson, decisions: [decision('D1')] }),
     )
     expect(changes.removed.get(removedDecisionsOwner)?.map(item => item.label)).toEqual([
-      'Decision D1',
       'Decision D2',
+      'Decision D3',
     ])
     expect(revisionSummaryText(changes)).toBe('2 decisions removed')
   })

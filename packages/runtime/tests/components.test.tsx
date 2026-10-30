@@ -894,31 +894,6 @@ describe('PlanWorkspace', () => {
     expect(html).not.toContain('vp-workspace__facts')
   })
 
-  it('renders and reviews an intent only plan through its vision', async () => {
-    const intent = { vision: scopedVision }
-    const html = renderToStaticMarkup(<PlanWorkspace model={intent} />)
-    expect(html).toContain('Typed page commands')
-    expect(html).toContain('aria-label="Plan vision review"')
-    expect(html).not.toContain('role="progressbar"')
-    expect(html).not.toContain('vp-workspace__main')
-    expect(html).not.toContain('vp-workspace__decisions')
-
-    const key = feedbackKey(location.pathname)
-    const prior = localStorage.getItem(key)
-    localStorage.removeItem(key)
-    const container = document.createElement('div')
-    const root = createRoot(container)
-    await act(async () => root.render(<PlanWorkspace model={intent} />))
-    const mast = container.querySelector<HTMLElement>('.vp-workspace__mast')!
-    expect(mast.dataset.status).toBe('unreviewed')
-    await act(async () => mast.querySelector<HTMLButtonElement>('[data-action="accept"]')?.click())
-    expect(mast.dataset.status).toBe('accepted')
-    expect(mast.querySelector('[data-action="accept"]')?.textContent).toBe('Undo accept')
-    await act(async () => root.unmount())
-    if (prior === null) localStorage.removeItem(key)
-    else localStorage.setItem(key, prior)
-  })
-
   it('ignores authored acceptance and preserves a browser review after remount', async () => {
     const accepted = { ...model, decisions: [{ ...model.decisions[0], status: 'accepted' }] }
     const key = feedbackKey(location.pathname)

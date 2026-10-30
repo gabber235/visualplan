@@ -541,16 +541,9 @@ export const planWorkspaceSchema = strictObject({
       )
       .default([]),
   }).default({ nodes: [], edges: [] }),
-  decisions: z.array(decisionSchema).default([]),
+  decisions: z.array(decisionSchema).min(1),
 }).superRefine((model, context) => {
   const unique = (values: string[]) => new Set(values).size === values.length
-  if (!model.decisions.length && !model.vision) {
-    context.addIssue({
-      code: 'custom',
-      path: ['vision'],
-      message: 'a plan without decisions needs a vision to review',
-    })
-  }
   if (model.vision) {
     const { scope, facts } = model.vision
     const visionIds = [...scope, ...facts].map(item => item.id)
@@ -753,7 +746,7 @@ export const stat: CatalogEntry = {
 export const planWorkspace: CatalogEntry = {
   name: 'PlanWorkspace',
   summary:
-    'A vision (problem, outcome, in and out of scope, and facts with sources) that is the confirmed intent, then code models, optional ownership comparisons, reasoning, examples, and edits including pure removals with anchored review. A vision alone is a valid plan. Its single json code block is the canonical model.',
+    'A vision (problem, outcome, in and out of scope, and facts with sources) that is the confirmed intent, then code models, optional ownership comparisons, reasoning, examples, and edits including pure removals with anchored review. Its single json code block is the canonical model.',
   staticEnums: {},
   example:
     '<PlanWorkspace>\n```json\n{"decisions":[{"id":"ownership","title":"One writer","code":[{"id":"owner","role":"model","file":"editor.ts","symbol":"Editor","language":"typescript","current":"interface Editor { state: MutableState }","proposed":"interface Editor { apply(command: Command): Result }"}]}]}\n```\n</PlanWorkspace>',

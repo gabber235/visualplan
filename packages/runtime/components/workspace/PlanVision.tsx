@@ -16,7 +16,7 @@ export function PlanVision({ model }: { model: WorkspaceModel }) {
   if (!model.vision && !model.thesis) return null
   // Decisions carry the approval of an unchanged vision, so its own mark appears only when needed.
   const plan = review.summary(planReviewId)
-  const confirm = !model.decisions.length || plan.ownInvalidated || plan.ownStatus !== 'unreviewed'
+  const confirm = plan.ownInvalidated || plan.ownStatus !== 'unreviewed'
   const vision = model.vision ?? {
     problem: model.thesis ?? '',
     outcome: model.thesis ?? '',

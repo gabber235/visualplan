@@ -389,37 +389,6 @@ describe('PlanWorkspace block', () => {
     expect(value).toMatchObject({ thesis: 'One owner' })
   })
 
-  it('accepts an intent only model with a vision and no decisions (golden)', () => {
-    const intent = JSON.stringify({
-      vision: {
-        problem: 'Two writers',
-        outcome: 'One writer',
-        scope: [{ id: 'editor', text: 'Editor writes', status: 'in' }],
-        facts: [{ id: 'lock', claim: 'Pages lock per tab', source: 'src/lock.ts' }],
-      },
-    })
-    const { value, issues } = parseBlock(
-      'PlanWorkspace',
-      `<PlanWorkspace>\n\`\`\`json\n${intent}\n\`\`\`\n</PlanWorkspace>\n`,
-    )
-    expect(issues).toEqual([])
-    expect(value).toMatchObject({
-      decisions: [],
-      vision: { scope: [{ id: 'editor', status: 'in' }] },
-    })
-  })
-
-  it('reports a Visual in a plan without decisions (edge)', () => {
-    const intent = JSON.stringify({ vision: { problem: 'Two writers', outcome: 'One writer' } })
-    const { issues } = parseBlock(
-      'PlanWorkspace',
-      `<PlanWorkspace>\n\`\`\`json\n${intent}\n\`\`\`\n\n<Visual decision="D1" id="flow" title="Flow">\ntext\n</Visual>\n</PlanWorkspace>\n`,
-    )
-    expect(issues.map(issue => issue.message)).toEqual([
-      '<Visual id="flow"> names unknown decision "D1".',
-    ])
-  })
-
   it('reports invalid json at the code block (error)', () => {
     const { issues } = parseBlock(
       'PlanWorkspace',

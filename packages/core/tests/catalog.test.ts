@@ -412,20 +412,8 @@ describe('Plan vision', () => {
     ])
   })
 
-  it('accepts an intent only plan without decisions (golden)', () => {
-    const parsed = planWorkspaceSchema.parse({
-      vision: {
-        ...vision,
-        scope: [{ id: 'policy', text: 'Gateway policy', status: 'in' }],
-        facts: [{ id: 'auth', claim: 'Auth runs first', source: 'src/auth.ts' }],
-      },
-    })
-    expect(parsed.decisions).toEqual([])
-    expect(parsed.vision?.scope).toEqual([{ id: 'policy', text: 'Gateway policy', status: 'in' }])
-  })
-
-  it('requires a vision when there are no decisions (error)', () => {
-    expect(planWorkspaceSchema.safeParse({ decisions: [] }).success).toBe(false)
+  it('requires at least one decision (error)', () => {
+    expect(planWorkspaceSchema.safeParse({ vision }).success).toBe(false)
     expect(planWorkspaceSchema.safeParse({ thesis: 'Only a thesis' }).success).toBe(false)
   })
 
@@ -439,14 +427,19 @@ describe('Plan vision', () => {
         ],
         facts: [{ id: 'same', claim: 'C', source: 'D' }],
       },
+      decisions: [decision],
     })
     expect(result.success).toBe(false)
     expect(result.error?.issues[0]?.message).toMatch(/unique across the vision/)
   })
 
   it('rejects ids with a colon and items missing required fields (edge)', () => {
+    expect(planWorkspaceSchema.safeParse({ vision, decisions: [decision] }).success).toBe(true)
     const parse = (value: unknown) =>
-      planWorkspaceSchema.safeParse({ vision: { ...vision, ...(value as object) } }).success
+      planWorkspaceSchema.safeParse({
+        vision: { ...vision, ...(value as object) },
+        decisions: [decision],
+      }).success
     expect(parse({ scope: [{ id: 'a:b', text: 'A', status: 'in' }] })).toBe(false)
     expect(parse({ scope: [{ text: 'A', status: 'in' }] })).toBe(false)
     expect(parse({ scope: [{ id: 'a', text: 'A' }] })).toBe(false)

@@ -519,7 +519,7 @@ function parsePlanWorkspace(node: MdNode, source?: string): BlockResult {
   }
   const { visuals, issues: visualIssues } = workspaceVisuals(node, source)
   if (value && typeof value === 'object') {
-    // An intent only plan may omit decisions; its Visuals then name unknown decisions.
+    // Malformed input may omit decisions; schema validation reports that separately.
     const authored = (value as { decisions?: unknown }).decisions
     const decisions = (Array.isArray(authored) ? authored : []) as {
       id?: unknown

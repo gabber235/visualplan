@@ -8,6 +8,9 @@ import { checkPlan } from '../src/build/check.js'
 import { resolvePlanFile } from '../src/commands/check.js'
 
 const examplePath = fileURLToPath(new URL('../templates/example.mdx', import.meta.url))
+const workspaceExamplePath = fileURLToPath(
+  new URL('../templates/workspace-example.mdx', import.meta.url),
+)
 let workDir: string
 
 beforeAll(async () => {
@@ -27,6 +30,11 @@ async function writePlan(name: string, body: string): Promise<string> {
 describe('checkPlan', () => {
   it('reports no issues for the valid example (golden)', async () => {
     const issues = await checkPlan(examplePath)
+    expect(issues).toEqual([])
+  })
+
+  it('reports no issues for the workspace example (golden)', async () => {
+    const issues = await checkPlan(workspaceExamplePath)
     expect(issues).toEqual([])
   })
 

@@ -1,28 +1,29 @@
 # PlanWorkspace
 
-Author one fenced `json` block inside `<PlanWorkspace>`, then optional `<Visual>` elements. `packages/cli/templates/workspace-example.mdx` is a complete example. `vplan check` names unknown keys and missing required fields; this list adds the optional fields (marked `?`) and how to fill them.
+Author one fenced `json` block inside `<PlanWorkspace>`, then optional `<Visual>` elements. Follow `packages/cli/templates/workspace-example.mdx` for a complete workspace. Fields marked `?` are optional; `vplan check` reports unknown keys and missing required fields.
 
 ## Fields
 
 Workspace
 
-- `vision?`: confirmed intent. Required when `decisions` is empty.
-- `decisions?`: design choices, ordered by dependency.
+- `vision?`: the confirmed intent.
+- `decisions`: at least one design choice, ordered by dependency.
 
 `vision`
 
 - `problem`, `outcome`: one sentence each.
 - `principles?`: strings.
-- `scope?`: `{ id, text, status: "in" | "out" }`. Move an item across the boundary by changing only `status`.
+- `scope?`: `{ id, text, status: "in" | "out" }`. When an item crosses the boundary, change only its `status`.
 - `facts?`: `{ id, claim, source }`. `source` names the inspected file and symbol, document, command, or observed behavior.
 
 Decision
 
-- `goal?`: context the title and code cannot carry.
-- `code`: entries below. Always include a `role: "model"` entry; validation does not require one.
-- `reasoning?`: `{ benefits?, costs? }`, each a list of cards `{ id?, title, detail? }`.
+- `title`: readable alone as an exported comment location.
+- `goal?`: only context the title and code cannot carry.
+- `code`: entries below. Always include a `role: "model"` entry; validation does not enforce one.
+- `reasoning?`: `{ benefits?, costs? }`, each a list of cards `{ id?, title, detail? }`, for material tradeoffs only.
 - `ownership?`: rows `{ id, area, current, proposed, removed?: string[] }` for areas that change owner or converge.
-- `examples?`: entries below.
+- `examples?`: entries below, only when they help assessment.
 
 Code entry
 
@@ -38,17 +39,19 @@ Example
 - `description?`: usage context. `outcome?`: nonobvious behavior.
 - `result?`: `{ label, value, language? }` (`language` defaults to `json`).
 
-Visual: `<Visual decision="<decision id>" id="<id>" title="...">` with an MDX body (mermaid fence, `Matrix`, `Compare`, `Chart`, `Stat`, `Svg`, table, short prose). It renders before the code model and supplements it.
+Visual: `<Visual decision="<decision id>" id="<id>" title="...">` with an MDX body (mermaid fence, `Matrix`, `Compare`, `Chart`, `Stat`, `Svg`, table, short prose). It supplements the code model; never use it in place of one.
 
-Legacy keys (`thesis`, `system`, and decision `status`, `summary`, `rationale`, `alternatives`, `consequences`, `risks`, `assumptions`, `contracts`, `scenarios`, `route`, `systemNodeIds`) still parse for old plans. Do not author them.
+Never author the legacy keys `thesis`, `system`, or decision `status`, `summary`, `rationale`, `alternatives`, `consequences`, `risks`, `assumptions`, `contracts`, `scenarios`, `route`, `systemNodeIds`. They parse only for old plans.
 
 ## Authoring rules
 
-- Ground `current` in inspected source. Never present illustrative code as an exact excerpt.
-- Edits complete the mechanism the model introduces: operation bodies, helpers, integration, callers, consequential deletions. A signature does not stand in for an implementation.
-- Pure removal: `change: "delete"` with the inspected `current` and no `proposed`. Never invent replacement code such as `// deleted`.
-- Show each snippet once; omit boilerplate. Omit optional text that repeats a title or code.
-- End at the change set: no implementation routes, evidence appendices, or correction histories.
-- Keep ids stable for unchanged concepts and never reuse one for a new concept. Comments and review marks follow ids; a renamed id reads as a removal plus an addition.
-- Titles should make an exported comment location understandable alone.
-- The browser owns review marks, comments, and export. Never author approval, review state, controls, or source metadata.
+- When a plan is large, split it into decisions ordered by dependency.
+- Make the first draft dense in concrete code: types, owned state, operation bodies, affected callers, consequential branches, failure handling.
+- Ground `current` in inspected source. When code is a sketch, condensed, or illustrative, say so in `summary`; never present it as an exact excerpt.
+- Make edits complete the mechanism the model introduces: operation bodies, helpers, integration, callers, consequential deletions. Never let a signature stand in for an implementation.
+- Trace each material behavioral claim through the shown code.
+- When code is removed, author `change: "delete"` with the inspected `current` and no `proposed`. Never invent replacement code such as `// deleted`.
+- Show each snippet once. Omit boilerplate and optional text that repeats a title or code.
+- End at the change set: no implementation routes, evidence inventories, research diaries, or correction histories.
+- When a concept is unchanged across revisions, keep its id; never reuse an id for a new concept.
+- Never author approval, review state, review controls, or source metadata.
