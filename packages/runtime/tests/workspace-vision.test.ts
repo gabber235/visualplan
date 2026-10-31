@@ -43,7 +43,6 @@ const scoped = planWorkspaceSchema.parse({
       { id: 'api', text: 'API writes', status: 'in' },
       { id: 'sync', text: 'Offline sync', status: 'out' },
     ],
-    facts: [{ id: 'lock', claim: 'Pages lock per tab', source: 'src/lock.ts: acquire' }],
   },
   decisions: [decision('D1')],
 })
@@ -51,10 +50,10 @@ const scoped = planWorkspaceSchema.parse({
 const withVision = (model: WorkspaceModel, vision: Partial<WorkspaceModel['vision'] & object>) =>
   planWorkspaceSchema.parse({ ...model, vision: { ...model.vision, ...vision } })
 
-describe('Compatibility of plans written before scope and facts', () => {
-  // What older runtimes hashed: the parsed model, whose vision had no scope or facts. A different
-  // revision would retire sent comments and orphan the legacy storage key.
-  const { scope: _scope, facts: _facts, ...oldVision } = legacy.vision!
+describe('Compatibility of plans written before scope', () => {
+  // What older runtimes hashed: the parsed model, whose vision had no scope. A different revision
+  // would retire sent comments and orphan the legacy storage key.
+  const { scope: _scope, ...oldVision } = legacy.vision!
   const pinnedRevision = fingerprint(JSON.stringify({ ...legacy, vision: oldVision }))
 
   it('keeps the revision hash and the whole vision fingerprint', () => {
@@ -83,10 +82,28 @@ describe('Compatibility of plans written before scope and facts', () => {
     let reviews = markReview(decisionReviewId('D1'), 'accepted', items, {})
     reviews = markReview(decisionReviewId('D2'), 'accepted', items, reviews)
     expect(summarizeReview(planReviewId, items, reviews).status).toBe('accepted')
-    // Reparsing the same plan, now with empty scope and facts defaults, changes nothing.
+    // Reparsing the same plan, now with an empty scope default, changes nothing.
     const reloaded = reconcileReviews(reviewItems(planWorkspaceSchema.parse(legacyJson)), reviews)
     expect(reloaded[planReviewId]?.invalidated).toBe(false)
     expect(summarizeReview(planReviewId, reviewItems(legacy), reloaded).status).toBe('accepted')
+  })
+})
+
+describe('Compatibility of plans written while visions had facts', () => {
+  // Runtimes with vision facts left empty facts out of the hash, so a plan without facts keeps it.
+  it('keeps the revision hash and plan snapshot of a scoped plan', () => {
+    const { problem, outcome, principles, scope } = scoped.vision!
+    const pinned = fingerprint(
+      JSON.stringify({ ...scoped, vision: { problem, outcome, principles, scope } }),
+    )
+    expect(workspaceRevision(scoped)).toBe(pinned)
+    expect(Object.keys(reviewItems(scoped).get(planReviewId)!.snapshot)).toEqual([
+      'problem',
+      'outcome',
+      '["scope","editor"]',
+      '["scope","api"]',
+      '["scope","sync"]',
+    ])
   })
 })
 
@@ -149,7 +166,6 @@ describe('Plan approval follows the confirmed vision', () => {
       withVision(scoped, {
         scope: scoped.vision!.scope.map(item => ({ ...item, status: 'out' as const })),
       }),
-      withVision(scoped, { facts: [{ id: 'lock', claim: 'Pages lock per tab', source: 'docs' }] }),
     ]) {
       const items = reviewItems(changed)
       const next = reconcileReviews(items, reviews)
@@ -162,7 +178,7 @@ describe('Plan approval follows the confirmed vision', () => {
     }
   })
 
-  it('ignores reordered scope and facts', () => {
+  it('ignores reordered scope', () => {
     const reviews = accept(scoped)
     const reordered = withVision(scoped, {
       scope: [...scoped.vision!.scope].reverse(),
@@ -189,7 +205,6 @@ describe('Plan approval follows the confirmed vision', () => {
     })
     const baseline = reviewedRevision(changed, reviews)!
     expect(baseline.vision?.scope).toEqual(scoped.vision?.scope)
-    expect(baseline.vision?.facts).toEqual(scoped.vision?.facts)
     const changes = diffRevisions(baseline, changed)
     expect(changes.fields.get(changeKey('vision', 'scope', 'editor'))?.kind).toBe('modified')
     expect(changes.removed.get(visionOwner)?.map(item => item.label)).toEqual([
@@ -200,14 +215,13 @@ describe('Plan approval follows the confirmed vision', () => {
 })
 
 describe('Vision revision diff', () => {
-  it('diffs scope and facts by id: add, edit, remove, and reorder', () => {
+  it('diffs scope by id: add, edit, remove, and reorder', () => {
     const next = withVision(scoped, {
       scope: [
         { id: 'api', text: 'API writes', status: 'out' },
         { id: 'editor', text: 'Editor and CLI writes', status: 'in' },
         { id: 'cli', text: 'CLI writes', status: 'in' },
       ],
-      facts: [{ id: 'lock', claim: 'Pages lock per window', source: 'src/lock.ts: acquire' }],
     })
     const changes = diffRevisions(scoped, next)
     expect(changes.fields.get(changeKey('vision', 'scope', 'api'))).toEqual({
@@ -219,10 +233,6 @@ describe('Vision revision diff', () => {
       previous: 'In scope: Editor writes',
     })
     expect(changes.fields.get(changeKey('vision', 'scope', 'cli'))).toEqual({ kind: 'added' })
-    expect(changes.fields.get(changeKey('vision', 'fact', 'lock'))).toEqual({
-      kind: 'modified',
-      previous: 'Pages lock per tab\nsrc/lock.ts: acquire',
-    })
     expect(changes.removed.get(visionOwner)).toEqual([
       {
         key: changeKey('vision', 'scope', 'sync'),
@@ -230,25 +240,17 @@ describe('Vision revision diff', () => {
         previous: 'Out of scope: Offline sync',
       },
     ])
-    expect(changes.counts.get(visionOwner)).toBe(5)
+    expect(changes.counts.get(visionOwner)).toBe(4)
     expect(changes.counts.get('D1')).toBe(0)
   })
 
-  it('reports nothing when scope and facts are only reordered', () => {
+  it('reports nothing when scope is only reordered', () => {
     const next = withVision(scoped, {
       scope: [...scoped.vision!.scope].reverse(),
     })
     const changes = diffRevisions(scoped, next)
     expect(changes.fields.size).toBe(0)
     expect(revisionSummaryText(changes)).toBe('')
-  })
-
-  it('reports a removed fact', () => {
-    const changes = diffRevisions(scoped, withVision(scoped, { facts: [] }))
-    expect(changes.removed.get(visionOwner)?.[0]).toMatchObject({
-      key: changeKey('vision', 'fact', 'lock'),
-      label: 'Relies on: Pages lock per tab',
-    })
   })
 })
 
@@ -294,19 +296,17 @@ describe('Feedback targets for vision items', () => {
       problem: 'Three writers',
       scope: [...scoped.vision!.scope].reverse(),
     })
-    for (const leaf of ['vision:scope:editor', 'vision:scope:sync', 'vision:fact:lock'])
+    for (const leaf of ['vision:scope:editor', 'vision:scope:sync'])
       expect(targetChanged(next, target(leaf))).toBe(false)
   })
 
   it('retires comments on changed, removed, or moved items', () => {
     const next = withVision(scoped, {
       scope: [{ id: 'editor', text: 'Editor and CLI writes', status: 'in' }],
-      facts: [{ id: 'lock', claim: 'Pages lock per tab', source: 'docs/locks.md' }],
     })
     expect(targetChanged(next, target('vision:scope:editor'))).toBe(true)
     expect(targetChanged(next, target('vision:scope:api'))).toBe(true)
     expect(targetChanged(next, target('vision:scope:sync'))).toBe(true)
-    expect(targetChanged(next, target('vision:fact:lock'))).toBe(true)
   })
 
   it('keeps comments on a scope item moved between in and out', () => {
@@ -320,16 +320,29 @@ describe('Feedback targets for vision items', () => {
 
   it('relocates a comment when an item id is renamed with the same content', () => {
     const next = withVision(scoped, {
-      facts: [{ id: 'tab-lock', claim: 'Pages lock per tab', source: 'src/lock.ts: acquire' }],
+      scope: scoped.vision!.scope.map(item =>
+        item.id === 'editor' ? { ...item, id: 'editor-writes' } : item,
+      ),
     })
-    const saved = target('vision:fact:lock')
+    const saved = target('vision:scope:editor')
     expect(targetChanged(next, saved)).toBe(false)
-    expect(snapshotTarget(next, saved).path).toEqual(['vision', 'vision:fact:tab-lock'])
+    expect(snapshotTarget(next, saved).path).toEqual(['vision', 'vision:scope:editor-writes'])
   })
 
-  it('ties the whole vision comment to scope and facts once they exist', () => {
+  it('ties the whole vision comment to scope once it exists', () => {
     const whole = snapshotTarget(scoped, { path: ['vision'], labels: ['Plan vision'], excerpt: '' })
-    expect(targetChanged(withVision(scoped, { facts: [] }), whole)).toBe(true)
+    expect(targetChanged(withVision(scoped, { scope: [] }), whole)).toBe(true)
     expect(targetChanged(scoped, whole)).toBe(false)
+  })
+
+  it('treats a comment saved on a removed vision fact as an unknown anchor (edge)', () => {
+    const saved: FeedbackTarget = {
+      path: ['vision', 'vision:fact:lock'],
+      labels: ['Plan vision', 'Relies on: Pages lock per tab'],
+      excerpt: 'Pages lock per tab',
+      fingerprint: 'stored',
+    }
+    expect(snapshotTarget(scoped, saved).path).toEqual(saved.path)
+    expect(() => targetChanged(scoped, saved)).not.toThrow()
   })
 })

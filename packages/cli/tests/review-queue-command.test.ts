@@ -23,7 +23,11 @@ function deps(
 ): ReviewQueueDeps {
   let n = 0
   return {
-    readSource: async (file: string) => `# ${file}\n\nbody\n`,
+    readSource: async (file: string) => ({
+      source: `# ${file}\n\nbody\n`,
+      label: file,
+      fromStdin: false,
+    }),
     check: async () => [],
     ensureDaemon: async () => ({ port: 1234 }),
     enqueue: async () => {
@@ -127,7 +131,9 @@ describe('runReviewQueue', () => {
     const enqueue = vi.fn()
     const d: ReviewQueueDeps = {
       ...deps({}, out),
-      check: async () => [{ line: 1, column: 1, message: 'bad', severity: 'error' }],
+      check: async () => [
+        { file: 'a.mdx', line: 1, column: 1, message: 'bad', severity: 'error' as const },
+      ],
       enqueue: enqueue as never,
     }
     await runReviewQueue(['a.mdx'], {}, d)

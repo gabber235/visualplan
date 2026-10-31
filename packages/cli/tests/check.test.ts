@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { checkPlan } from '../src/build/check.js'
-import { resolvePlanFile } from '../src/commands/check.js'
+import { resolvePlanFile } from '../src/commands/input.js'
 
 const examplePath = fileURLToPath(new URL('../templates/example.mdx', import.meta.url))
 const workspaceExamplePath = fileURLToPath(
@@ -44,6 +44,23 @@ describe('checkPlan', () => {
     expect(issues).toHaveLength(1)
     expect(issues[0]?.message).toMatch(/type="bogus" is invalid/)
     expect(issues[0]?.message).toMatch(/note, tip, risk, decision, warn/)
+  })
+
+  it('flags vision facts as an unknown key (error)', async () => {
+    const model = {
+      vision: {
+        problem: 'Two writers',
+        outcome: 'One writer',
+        facts: [{ id: 'lock', claim: 'Pages lock per tab', source: 'src/lock.ts' }],
+      },
+      decisions: [{ id: 'D1', title: 'One writer' }],
+    }
+    const path = await writePlan(
+      'vision-facts.mdx',
+      `<PlanWorkspace>\n\`\`\`json\n${JSON.stringify(model)}\n\`\`\`\n</PlanWorkspace>\n`,
+    )
+    const issues = await checkPlan(path)
+    expect(issues.map(issue => issue.message).join('\n')).toMatch(/unknown key "facts"/)
   })
 
   it('flags an unknown component (error)', async () => {

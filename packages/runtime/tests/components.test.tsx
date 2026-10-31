@@ -17,7 +17,6 @@ import { copyText, ShareButton } from '../components/ShareButton.js'
 import { Stat } from '../components/Stat.js'
 import { ThemeToggle } from '../components/ThemeToggle.js'
 import { PlanWorkspace } from '../components/workspace/PlanWorkspace.js'
-import { shortSource } from '../components/workspace/PlanVision.js'
 import { feedbackKey } from '../components/workspace/feedback.js'
 import { Layout } from '../Layout.js'
 
@@ -857,41 +856,23 @@ describe('PlanWorkspace', () => {
       { id: 'commands', text: 'Typed page commands', status: 'in' },
       { id: 'sync', text: 'Offline sync', status: 'out' },
     ],
-    facts: [{ id: 'writers', claim: 'Three services write pages', source: 'rg "page.write"' }],
   }
 
-  it('renders scope and the facts the plan relies on in the vision (golden)', () => {
+  it('renders scope in the vision (golden)', () => {
     const html = renderToStaticMarkup(<PlanWorkspace model={{ ...model, vision: scopedVision }} />)
     expect(html).toContain(
       '<section class="vp-workspace__scope" data-scope="in" aria-label="In scope"><span class="vp-workspace__scope-badge">In</span><ul><li data-review-id="vision:scope:commands" data-review-label="In scope: Typed page commands">Typed page commands</li></ul></section>',
     )
     expect(html).toContain('data-scope="out"')
     expect(html).toContain('data-review-id="vision:scope:sync"')
-    expect(html).toContain(
-      '<li data-review-id="vision:fact:writers" data-review-label="Relies on: Three services write pages"><span>Three services write pages</span><cite>rg &quot;page.write&quot;</cite></li>',
-    )
     expect(html).toContain('aria-label="Scope"')
     // Decisions carry the approval of an unchanged vision, so it has no controls of its own.
     expect(html).not.toContain('aria-label="Plan vision review"')
   })
 
-  it('shortens a long fact source to its tail and keeps the full path for hover and screen readers', () => {
-    const source = 'config/agents/tools/visualplan/packages/core/src/index.ts:503'
-    const vision = { ...scopedVision, facts: [{ id: 'gate', claim: 'Needs a decision', source }] }
-    const html = renderToStaticMarkup(<PlanWorkspace model={{ ...model, vision }} />)
-    expect(html).toContain(
-      `<cite title="${source}"><span aria-hidden="true">\u2026/src/index.ts:503</span><span class="vp-workspace__fact-full">${source}</span></cite>`,
-    )
-    expect(shortSource('headroom 0.41.0 proxy/server.py:1091')).toBe(
-      'headroom 0.41.0 proxy/server.py:1091',
-    )
-    expect(shortSource('home/agents.nix:81')).toBe('home/agents.nix:81')
-  })
-
-  it('omits scope and fact sections a vision does not have', () => {
+  it('omits the scope section a vision does not have', () => {
     const html = renderToStaticMarkup(<PlanWorkspace model={model} />)
     expect(html).not.toContain('vp-workspace__scope')
-    expect(html).not.toContain('vp-workspace__facts')
   })
 
   it('ignores authored acceptance and preserves a browser review after remount', async () => {

@@ -189,47 +189,19 @@
   background: transparent;
   color: var(--vp-muted);
 }
-.vp-workspace__scope ul,
-.vp-workspace__facts ul {
+.vp-workspace__scope ul {
   display: grid;
   gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.vp-workspace__scope li,
-.vp-workspace__facts li {
+.vp-workspace__scope li {
   font-size: 14px;
   line-height: 1.45;
 }
 .vp-workspace__scope[data-scope="out"] li {
   color: var(--vp-muted);
-}
-.vp-workspace__facts li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 12px;
-  padding: 4px 0;
-}
-.vp-workspace__facts li + li {
-  border-top: 1px solid var(--vp-border);
-}
-.vp-workspace__facts cite {
-  color: var(--vp-muted);
-  font-family: var(--vp-mono);
-  font-size: 12px;
-  font-style: normal;
-  overflow-wrap: anywhere;
-}
-.vp-workspace__fact-full {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
 }
 .vp-workspace__decisions {
   display: grid;

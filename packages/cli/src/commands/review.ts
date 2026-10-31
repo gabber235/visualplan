@@ -10,15 +10,13 @@
  * a real daemon, build, or browser; `index.ts` wires the real implementations.
  */
 import { basename, dirname, resolve } from 'node:path'
-import { readFile } from 'node:fs/promises'
 import type { Feedback } from '@visualplan/core'
-import type { CheckIssue } from '../build/check.js'
-import { checkSource } from '../build/check.js'
-import { inlineSvgIncludes, svgBaseDir } from '../build/svg-include.js'
 import { readConfig, sharesPlan } from '../config.js'
 import { awaitVerdict, type EnqueueResponse, enqueuePlan } from '../review/client.js'
 import { ensureDaemon } from '../review/ensure-daemon.js'
-import { resolvePlanFile, printIssues } from './check.js'
+import { printIssues } from './check.js'
+import { checkPlanSource, type PlanSource, readPlanSource } from './input.js'
+import type { LocatedIssue } from './plan-folder.js'
 import { formatFeedback } from '../review/format.js'
 import open from 'open'
 
@@ -34,8 +32,8 @@ export interface ReviewQueueOptions {
 
 /** Injectable collaborators so the orchestration is testable in isolation. */
 export interface ReviewQueueDeps {
-  readSource: (file: string) => Promise<string>
-  check: (source: string) => Promise<CheckIssue[]>
+  readSource: (file: string) => Promise<PlanSource>
+  check: (plan: PlanSource) => Promise<LocatedIssue[]>
   ensureDaemon: () => Promise<{ port: number }>
   enqueue: (port: number, source: string, file: string) => Promise<EnqueueResponse>
   awaitVerdict: (port: number, id: string) => Promise<Feedback>
@@ -51,10 +49,11 @@ export async function runReviewQueue(
   // Read and check every plan up front; a single bad plan fails the whole run without enqueuing.
   const sources: Array<{ file: string; source: string }> = []
   for (const file of files) {
-    const source = await deps.readSource(file)
-    const issues = await deps.check(source)
+    const plan = await deps.readSource(file)
+    const { source } = plan
+    const issues = await deps.check(plan)
     if (issues.length > 0) {
-      printIssues(file, issues)
+      printIssues(issues)
       process.exitCode = 1
       return
     }
@@ -107,11 +106,8 @@ export async function runReview(files: string[], options: ReviewQueueOptions): P
   const { theme, daemonTimeout } = config
   const enableSharing = sharesPlan(config, options.share)
   const deps: ReviewQueueDeps = {
-    readSource: async (file: string) => {
-      const raw = (await readFile(resolvePlanFile(file), 'utf8')).replace(/^﻿/, '')
-      return (await inlineSvgIncludes(raw, svgBaseDir(file, false))).source
-    },
-    check: checkSource,
+    readSource: readPlanSource,
+    check: checkPlanSource,
     ensureDaemon: () => ensureDaemon({ idleMs: daemonTimeout }),
     enqueue: (port, source, file) =>
       enqueuePlan(port, { source, theme, dir: planDir(file), key: resolve(file), enableSharing }),

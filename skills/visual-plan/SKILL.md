@@ -9,7 +9,7 @@ description: >-
 # Visual Plan
 
 - When a local planning skill is active, follow its investigation, publication, validation, and revision workflow over this one.
-- When the plan is a software design, author a `PlanWorkspace` and read [workspace authoring](references/plan-workspace.md) first. Otherwise use stock components.
+- When the plan is a software design, author a `PlanWorkspace` plan folder and read [workspace authoring](references/plan-workspace.md) first. Otherwise use stock components.
 
 ## Software designs
 
@@ -22,13 +22,13 @@ description: >-
 
 ## Author and deliver
 
-- Write a retained `.mdx` file that starts with one `# Title`, with no imports or frontmatter. Reuse its path for every revision. Never edit generated HTML.
-- Before writing, run `vplan components` for exact syntax. Before handoff, run `vplan check <file>.mdx` and fix every error and warning.
+- Retain the plan at one path for every revision: a plan folder for a workspace, otherwise an `.mdx` file that starts with one `# Title`, with no imports or frontmatter. Edit a decision's YAML or MDX file directly. Never edit generated HTML.
+- Before writing, run `vplan components` for exact syntax. Before handoff, run `vplan check <plan>` and fix every error and warning.
 - Never claim a passing `check` proves the plan renders; only a successful render does.
 - Give data components Markdown children, not object props. Use a component only when it teaches something. Never invent unsupported fields.
 - When text contains a literal `<`, `>`, `{`, or `}`, wrap it in backticks or a fence. Never write raw HTML, Markdown images, emojis, or punctuation dashes.
 - When the project provides a pinned renderer and publisher, use them. When HTML, live preview, PDF, or JPG output is needed, read [static exports](references/static-exports.md).
-- Start a blocking review session (`vplan <file>.mdx`) only when requested or established for the project, and give `--timeout` with units (`45m`).
+- Start a blocking review session (`vplan <plan>`) only when requested or established for the project, and give `--timeout` with units (`45m`).
 - Treat Approve, Deny, and Iterate as feedback, never as permission to implement.
 - When reporting, give clickable source and artifact paths and only the checks you actually ran.
 

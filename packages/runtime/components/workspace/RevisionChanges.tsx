@@ -38,12 +38,21 @@ export function revisionKey(pathname: string): string {
   return `vp-revision:${pathname}`
 }
 
+/** Revisions saved while plans had vision facts still parse; their facts are dropped. */
+function withoutVisionFacts(model: unknown): unknown {
+  if (!model || typeof model !== 'object' || !('vision' in model)) return model
+  const { vision } = model
+  if (!vision || typeof vision !== 'object' || !('facts' in vision)) return model
+  const { facts: _facts, ...rest } = vision
+  return { ...model, vision: rest }
+}
+
 async function storedRevisions(key: string, model: WorkspaceModel) {
   const revision = workspaceRevision(model)
   const parsed = baselineSchema.safeParse(JSON.parse((await readSavedFeedback(key, key)) ?? 'null'))
   const stored = parsed.success ? parsed.data : undefined
   const previous = stored?.current.revision === revision ? stored.previous : stored?.current
-  const result = previous && planWorkspaceSchema.safeParse(previous.model)
+  const result = previous && planWorkspaceSchema.safeParse(withoutVisionFacts(previous.model))
   return {
     revision,
     stored,

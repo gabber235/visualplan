@@ -45,13 +45,9 @@ function cardText(card: Card): string {
   return card.detail ? `${card.title}\n${card.detail}` : card.title
 }
 
-/** Scope items and facts diff like reasoning cards; facts read as their claim then source. */
+/** Scope items diff like reasoning cards. */
 function scopeCards(items: NonNullable<WorkspaceModel['vision']>['scope']): Card[] {
   return items.map(item => ({ id: item.id, title: scopeText(item) }))
-}
-
-function factCards(facts: { id: string; claim: string; source: string }[]): Card[] {
-  return facts.map(fact => ({ id: fact.id, title: fact.claim, detail: fact.source }))
 }
 
 function ownershipText(row: WorkspaceDecision['ownership'][number]): string {
@@ -123,20 +119,6 @@ export function diffRevisions(previous: WorkspaceModel, current: WorkspaceModel)
   }
   for (const { card, id } of scope.removed)
     remove({ key: changeKey('vision', 'scope', id), label: card.title, previous: card.title })
-  const facts = pairCards(
-    factCards(previous.vision?.facts ?? []),
-    factCards(current.vision?.facts ?? []),
-  )
-  for (const { card, id, old } of facts.pairs) {
-    if (!old) added(changeKey('vision', 'fact', id))
-    else compare(changeKey('vision', 'fact', id), cardText(old), cardText(card))
-  }
-  for (const { card, id } of facts.removed)
-    remove({
-      key: changeKey('vision', 'fact', id),
-      label: `Relies on: ${card.title}`,
-      previous: cardText(card),
-    })
 
   const decisions = matchById(previous.decisions, decision => decision.id)
   for (const decision of current.decisions) {

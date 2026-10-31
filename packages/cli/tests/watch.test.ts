@@ -90,3 +90,42 @@ describe('startDevServer (--watch)', () => {
     }
   }, 60_000)
 })
+
+describe('startDevServer (--watch) on a plan folder', () => {
+  it('reassembles and pushes a full-reload when a decision file changes (regression)', async () => {
+    const folder = await mkdtemp(join(tmpdir(), 'visualplan-watch-folder-'))
+    const decision = join(folder, 'decision.yaml')
+    await writeFile(decision, 'first')
+    let assembled = 0
+    const assemble = async () => {
+      assembled += 1
+      return '# Folder\n\ntext\n'
+    }
+    const folderServer = await startDevServer({ folder, assemble }, 'system', 9174)
+    const ws = new WebSocket(folderServer.url.replace('http', 'ws'), 'vite-hmr')
+    try {
+      const reload = new Promise<string>((resolve, reject) => {
+        ws.addEventListener('message', event => {
+          const message = JSON.parse(String(event.data))
+          if (message.type === 'full-reload') resolve(message.type)
+        })
+        ws.addEventListener('error', () => reject(new Error('HMR socket error')))
+      })
+      await new Promise(resolve => ws.addEventListener('open', resolve))
+      let tick = 0
+      const retouch = setInterval(() => {
+        void writeFile(decision, `edit ${++tick}`)
+      }, 2_000)
+      try {
+        await expect(reload).resolves.toBe('full-reload')
+        expect(assembled).toBeGreaterThan(1)
+      } finally {
+        clearInterval(retouch)
+      }
+    } finally {
+      ws.close()
+      await folderServer.close()
+      await rm(folder, { recursive: true, force: true })
+    }
+  }, 60_000)
+})

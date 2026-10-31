@@ -66,7 +66,7 @@ function field(label: string, text: string | undefined, language?: string) {
 
 /**
  * The confirmed intent the plan approval rests on. Empty optional fields add no keys, so a vision
- * without scope, facts, or principles keeps the snapshot it had before those fields existed.
+ * without scope or principles keeps the snapshot it had before those fields existed.
  */
 function visionSnapshot(model: WorkspaceModel): ReviewSnapshot {
   const vision = model.vision
@@ -79,11 +79,6 @@ function visionSnapshot(model: WorkspaceModel): ReviewSnapshot {
     snapshot.principles = field('Design principles', [...vision.principles].sort().join('\n'))
   for (const item of vision.scope)
     snapshot[JSON.stringify(['scope', item.id])] = field('Scope', scopeText(item))
-  for (const fact of vision.facts)
-    snapshot[JSON.stringify(['fact', fact.id])] = field(
-      'Relies on',
-      `${fact.claim}\nSource: ${fact.source}`,
-    )
   return snapshot
 }
 

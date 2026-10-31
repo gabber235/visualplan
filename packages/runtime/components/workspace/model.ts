@@ -5,16 +5,12 @@ export type WorkspaceDecision = WorkspaceModel['decisions'][number]
 export type WorkspaceVision = NonNullable<WorkspaceModel['vision']>
 
 /**
- * The vision as authored. Scope and facts default to empty, and leaving the empty defaults out keeps
- * the revision hash and comment fingerprints of plans written before those fields existed.
+ * The vision as authored. Scope defaults to empty, and leaving the empty default out keeps the
+ * revision hash and comment fingerprints of plans written before scope existed.
  */
 export function authoredVision(vision: WorkspaceVision) {
-  const { scope, facts, ...rest } = vision
-  return {
-    ...rest,
-    ...(scope.length ? { scope } : {}),
-    ...(facts.length ? { facts } : {}),
-  }
+  const { scope, ...rest } = vision
+  return { ...rest, ...(scope.length ? { scope } : {}) }
 }
 
 type ScopeItem = WorkspaceVision['scope'][number]

@@ -4,7 +4,7 @@ import { InvalidArgumentError } from 'commander'
 import ms from 'ms'
 import open from 'open'
 import type { Feedback } from '@visualplan/core'
-import { checkPlan, checkSource } from '../build/check.js'
+import { checkPlan } from '../build/check.js'
 import { buildHtml, startDevServer } from '../build/compile.js'
 import { readSnapshot, writeSnapshot } from '../build/snapshots.js'
 import { readConfig, sharesPlan } from '../config.js'
@@ -12,8 +12,8 @@ import { awaitVerdict, type EnqueueResponse, enqueuePlan } from '../review/clien
 import { ensureDaemon } from '../review/ensure-daemon.js'
 import { exitCodeFor, formatFeedback } from '../review/format.js'
 import { runReview } from '../review/session.js'
-import { printIssues, resolvePlanFile } from './check.js'
-import { readPlanSource } from './input.js'
+import { printIssues } from './check.js'
+import { checkPlanSource, isPlanFolder, readPlanSource, resolvePlanFile } from './input.js'
 
 /** Default `--review` timeout: 4 hours. A review waits on a human, so the window is generous. */
 export const DEFAULT_REVIEW_TIMEOUT_MS = 4 * 60 * 60 * 1000
@@ -62,7 +62,8 @@ async function resolveBaseline(
 ): Promise<string | undefined> {
   if (options.diff === false) return undefined
   if (typeof options.diff === 'string') {
-    return (await readFile(resolve(options.diff), 'utf8')).replace(/^﻿/, '')
+    if (isPlanFolder(options.diff)) return (await readPlanSource(options.diff)).source
+    return (await readFile(resolve(options.diff), 'utf8')).replace(/^\ufeff/, '')
   }
   if (absPath === undefined) return undefined
   const baseline = await readSnapshot(absPath)
@@ -105,9 +106,11 @@ export function parseTimeout(value: string): number {
   return millis
 }
 
-function defaultOutPath(absMdx: string): string {
-  const stem = basename(absMdx, extname(absMdx))
-  return join(dirname(absMdx), `${stem}.plan.html`)
+/** Beside an .mdx file as `<stem>.plan.html`; inside a plan folder as `plan.html`. */
+function defaultOutPath(absPlan: string, folder: boolean): string {
+  if (folder) return join(absPlan, 'plan.html')
+  const stem = basename(absPlan, extname(absPlan))
+  return join(dirname(absPlan), `${stem}.plan.html`)
 }
 
 /**
@@ -144,10 +147,11 @@ export async function runRender(file: string | undefined, options: RenderOptions
   // Review (the default) is a server that blocks on human feedback; it accepts a file or piped stdin
   // because it serves a snapshot read once (no watching), unlike --watch.
   if (rendersReview(options)) {
-    const { source, label, fromStdin } = await readPlanSource(file)
-    const issues = await checkSource(source)
+    const plan = await readPlanSource(file)
+    const { source, fromStdin } = plan
+    const issues = await checkPlanSource(plan)
     if (issues.length > 0) {
-      printIssues(label, issues)
+      printIssues(issues)
       process.exitCode = 1
       return
     }
@@ -195,15 +199,39 @@ export async function runRender(file: string | undefined, options: RenderOptions
     if (file === undefined || file === '-') {
       throw new Error('--watch needs a plan file; it cannot watch stdin.')
     }
-    const absMdx = resolvePlanFile(file)
-    const issues = await checkPlan(absMdx)
+    if (isPlanFolder(file)) {
+      const plan = await readPlanSource(file)
+      const issues = await checkPlanSource(plan)
+      if (issues.length > 0) {
+        printIssues(issues)
+        process.exitCode = 1
+        return
+      }
+      const folder = resolve(file)
+      const baseline = await resolveBaseline(options, plan.source, folder)
+      const assemble = async () => (await readPlanSource(file)).source
+      const server = await startDevServer(
+        { folder, assemble },
+        theme,
+        options.port,
+        baseline,
+        enableSharing,
+      )
+      process.stdout.write(
+        `Visual Plan watching ${file}\n  ${server.url}\n  (edit any file in the folder to hot-reload; Ctrl+C to stop)\n`,
+      )
+      if (options.open !== false) await open(server.url)
+      return
+    }
+    const absPlan = resolvePlanFile(file)
+    const issues = await checkPlan(absPlan)
     if (issues.length > 0) {
-      printIssues(file, issues)
+      printIssues(issues.map(issue => ({ file, ...issue })))
       process.exitCode = 1
       return
     }
-    const baseline = await resolveBaseline(options, await readFile(absMdx, 'utf8'), absMdx)
-    const server = await startDevServer(absMdx, theme, options.port, baseline, enableSharing)
+    const baseline = await resolveBaseline(options, await readFile(absPlan, 'utf8'), absPlan)
+    const server = await startDevServer(absPlan, theme, options.port, baseline, enableSharing)
     process.stdout.write(
       `Visual Plan watching ${file}\n  ${server.url}\n  (edit the file to hot-reload; Ctrl+C to stop)\n`,
     )
@@ -211,10 +239,11 @@ export async function runRender(file: string | undefined, options: RenderOptions
     return
   }
 
-  const { source, label, fromStdin } = await readPlanSource(file)
-  const issues = await checkSource(source)
+  const plan = await readPlanSource(file)
+  const { source, fromStdin } = plan
+  const issues = await checkPlanSource(plan)
   if (issues.length > 0) {
-    printIssues(label, issues)
+    printIssues(issues)
     process.exitCode = 1
     return
   }
@@ -241,7 +270,9 @@ export async function runRender(file: string | undefined, options: RenderOptions
   }
 
   // Not stdout, so there is a file destination: --out, or the default beside a file input.
-  const out = options.out ? resolve(options.out) : defaultOutPath(resolve(file as string))
+  const out = options.out
+    ? resolve(options.out)
+    : defaultOutPath(resolve(file as string), isPlanFolder(file))
   await writeFile(out, html)
   process.stdout.write(`Rendered ${out}\n`)
   if (options.open !== false) await open(out)

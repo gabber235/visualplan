@@ -21,6 +21,9 @@ export interface CheckIssue {
   /** Defaults to 'error' when absent. The syntax checks here omit it (all errors); the quality lint
    * emits 'warn'. Both fail `check` (exit 1); severity only changes the printed label. */
   severity?: 'error' | 'warn'
+  /** For a workspace issue: the path in the PlanWorkspace model it concerns, such as
+   *  `['decisions', 2, 'code', 0, 'proposed']`, so a plan folder can point at the YAML that holds it. */
+  target?: (string | number)[]
 }
 
 interface JsxAttribute {

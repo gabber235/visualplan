@@ -25,12 +25,17 @@ const program = new Command('vplan')
 
 program
   .command('render', { isDefault: true })
-  .description('Review a plan .mdx interactively (default), or render it to a static page')
-  .argument('[file]', 'the plan .mdx file; - or omit to read from stdin')
+  .description(
+    'Review a plan folder or .mdx interactively (default), or render it to a static page',
+  )
+  .argument('[file]', 'a plan folder or .mdx file; - or omit to read from stdin')
   .option('--static', 'render a static HTML page and open it, instead of the review session')
   .option('--watch', 'start a hot-reloading dev server instead of writing a file')
   .option('--port <number>', 'port for the --watch dev server', parsePort, DEFAULT_DEV_PORT)
-  .option('--out <path>', 'output HTML path (defaults to <file>.plan.html; implies --static)')
+  .option(
+    '--out <path>',
+    'output HTML path (defaults to <file>.plan.html, or plan.html inside a folder; implies --static)',
+  )
   .option('--stdout', 'write the rendered HTML to stdout instead of a file (implies --static)')
   .option(
     '--review',
@@ -49,7 +54,7 @@ program
   )
   .option(
     '--diff <path>',
-    'diff this render against a baseline plan .mdx (overrides the snapshot cache)',
+    'diff this render against a baseline plan folder or .mdx (overrides the snapshot cache)',
   )
   .option('--no-diff', 'skip iteration diffing (do not read or write the snapshot cache)')
   .option('--no-share', 'hide the share button (overrides the enableSharing config setting)')
@@ -60,7 +65,7 @@ program
 program
   .command('review')
   .description('Queue one or more plans for review in the shared Review Queue and print verdicts')
-  .argument('<files...>', 'the plan .mdx files to review')
+  .argument('<files...>', 'the plan folders or .mdx files to review')
   .option('--json', 'print one JSON object keyed by file path instead of streaming text')
   .option('--no-share', 'hide the share button (overrides the enableSharing config setting)')
   .option('--no-open', 'do not open the queue in a browser')
@@ -91,7 +96,7 @@ program
   .command('export')
   .description('Render a plan to a PDF or JPG (headless via Chromium)')
   .argument('<format>', 'pdf or jpg', parseExportFormat)
-  .argument('[file]', 'the plan .mdx file; - or omit to read from stdin')
+  .argument('[file]', 'a plan folder or .mdx file; - or omit to read from stdin')
   .option('--out <path>', 'output path (defaults to <file>.<pdf|jpg>; required for stdin)')
   .option('--theme <theme>', 'override the baked theme: light | dark | system', parseTheme)
   .option('--browser <path>', 'Chromium binary to render with (else auto-discovered)')
@@ -103,13 +108,13 @@ program
 program
   .command('share')
   .description('Print a shareable visualplan.dev/view link for a plan')
-  .argument('[file]', 'the plan .mdx file; - or omit to read from stdin')
+  .argument('[file]', 'a plan folder or .mdx file; - or omit to read from stdin')
   .action((file: string | undefined) => runShare(file))
 
 program
   .command('check')
-  .description('Validate a plan .mdx (compile + component checks) without rendering')
-  .argument('<file>', 'the plan .mdx file to validate')
+  .description('Validate a plan folder or .mdx (compile + component checks) without rendering')
+  .argument('<file>', 'the plan folder or .mdx file to validate')
   .action((file: string) => runCheck(file))
 
 program

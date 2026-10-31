@@ -148,6 +148,17 @@ describe('Revision baseline in the browser', () => {
     expect((await loadPreviousRevision('plan', second))?.decisions[0]?.title).toBe('One writer')
     expect((await loadPreviousRevision('plan', third))?.decisions[0]?.title).toBe('A single writer')
   })
+
+  it('reads a revision saved while plans had vision facts, dropping the facts (edge)', async () => {
+    const stored = {
+      ...base,
+      vision: { ...base.vision, facts: [{ id: 'f', claim: 'C', source: 'S' }] },
+    }
+    localStorage.setItem('plan', JSON.stringify({ current: { revision: 'old', model: stored } }))
+    const previous = await loadPreviousRevision('plan', base)
+    expect(previous?.vision).toEqual(base.vision)
+    expect(diffRevisions(previous!, base).fields.size).toBe(0)
+  })
 })
 
 describe('Changes since the last review, for plans without an opened revision', () => {

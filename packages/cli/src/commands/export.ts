@@ -2,11 +2,10 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 import { InvalidArgumentError } from 'commander'
 import open from 'open'
 import { captureToFile, type ExportFormat } from '../build/capture.js'
-import { checkSource } from '../build/check.js'
 import { buildHtml } from '../build/compile.js'
 import { readConfig, type Theme, THEMES } from '../config.js'
 import { printIssues } from './check.js'
-import { readPlanSource } from './input.js'
+import { checkPlanSource, isPlanFolder, readPlanSource } from './input.js'
 
 export interface ExportOptions {
   /** Output path; defaults to `<file>.<pdf|jpg>` beside the input. Required for stdin input. */
@@ -36,9 +35,10 @@ export function parseTheme(value: string): Theme {
 
 /** Default export path: the input file's stem with the format extension, beside the input. Plain
  * `plan.pdf` / `plan.jpg` (not `.plan.pdf`), per the approved plan. */
-export function defaultExportPath(absMdx: string, format: ExportFormat): string {
-  const stem = basename(absMdx, extname(absMdx))
-  return join(dirname(absMdx), `${stem}.${format}`)
+export function defaultExportPath(absPlan: string, format: ExportFormat, folder = false): string {
+  if (folder) return join(absPlan, `plan.${format}`)
+  const stem = basename(absPlan, extname(absPlan))
+  return join(dirname(absPlan), `${stem}.${format}`)
 }
 
 /**
@@ -52,11 +52,12 @@ export async function runExport(
   file: string | undefined,
   options: ExportOptions,
 ): Promise<void> {
-  const { source, label, fromStdin } = await readPlanSource(file)
+  const plan = await readPlanSource(file)
+  const { source, fromStdin } = plan
 
-  const issues = await checkSource(source)
+  const issues = await checkPlanSource(plan)
   if (issues.length > 0) {
-    printIssues(label, issues)
+    printIssues(issues)
     process.exitCode = 1
     return
   }
@@ -66,7 +67,7 @@ export async function runExport(
   }
   const out = options.out
     ? resolve(options.out)
-    : defaultExportPath(resolve(file as string), format)
+    : defaultExportPath(resolve(file as string), format, isPlanFolder(file))
 
   const theme = options.theme ?? (await readConfig()).theme
   const html = await buildHtml(source, { theme, lockTheme: true, enableSharing: false })

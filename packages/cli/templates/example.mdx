@@ -132,9 +132,6 @@ flowchart LR
     "scope": [
       { "id": "gateway-limit", "status": "in", "text": "A sliding window limiter in the gateway" },
       { "id": "tiers", "status": "out", "text": "Per plan quota tiers" }
-    ],
-    "facts": [
-      { "id": "auth", "claim": "Authentication runs before the limiter and supplies the token.", "source": "src/gateway/middleware.ts: authenticate" }
     ]
   },
   "decisions": [

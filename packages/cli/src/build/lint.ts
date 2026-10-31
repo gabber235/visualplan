@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises'
 import remarkFrontmatter from 'remark-frontmatter'
 import remarkGfm from 'remark-gfm'
 import remarkMdx from 'remark-mdx'
@@ -58,12 +57,6 @@ interface MdNode {
   value?: string
   children?: MdNode[]
   position?: { start: { line: number; column: number } }
-}
-
-/** Lint a plan file. Read separately from the syntax check; `check` only lints a plan that already
- * passes the syntax check, so the parse here never sees malformed MDX. */
-export async function lintPlan(mdxPath: string): Promise<CheckIssue[]> {
-  return lintSource(await readFile(mdxPath, 'utf8'))
 }
 
 /** Walk an mdast tree and emit the quality warnings for a (syntactically valid) plan source. */
@@ -127,19 +120,22 @@ function lintWorkspace(node: MdNode, issues: CheckIssue[]): void {
   if (!value) return
   const model = value as PlanWorkspaceModel
   const snippets = new Map<string, string>()
-  const warn = (message: string) => issues.push({ ...at(node), severity: 'warn' as const, message })
-  for (const decision of model.decisions) {
+  const warn = (target: (string | number)[], message: string) =>
+    issues.push({ ...at(node), severity: 'warn' as const, message, target })
+  for (const [index, decision] of model.decisions.entries()) {
     if (!decision.code.some(code => code.role === 'model')) {
       warn(
+        ['decisions', index, 'code'],
         `Decision ${decision.id} needs a current and proposed code model. Mark its comparison with role: "model".`,
       )
     }
     if (decision.route.length) {
       warn(
+        ['decisions', index, 'route'],
         `Decision ${decision.id} includes an implementation route. Keep necessary ordering or constraints beside the affected model or code.`,
       )
     }
-    for (const code of decision.code) {
+    for (const [codeIndex, code] of decision.code.entries()) {
       for (const part of ['current', 'proposed', 'diff'] as const) {
         const content = code[part]?.trim()
         if (!content) continue
@@ -147,6 +143,7 @@ function lintWorkspace(node: MdNode, issues: CheckIssue[]): void {
         const previous = snippets.get(content)
         if (previous)
           warn(
+            ['decisions', index, 'code', codeIndex, part],
             `Code at ${target} repeats ${previous}. Show the snippet once and reference it where needed.`,
           )
         else snippets.set(content, target)
@@ -177,7 +174,7 @@ function lintPhaseProse(phase: MdNode, issues: CheckIssue[]): void {
     issues.push({
       ...at(phase),
       severity: 'warn',
-      message: `This phase is ${prose} characters of prose with no diagram, list, or component. Lead with the visual and keep the prose to a line or two of intent.`,
+      message: `This phase is ${prose} characters of prose (limit ${WALL_OF_PROSE_CHARS}) with no diagram, list, or component. Lead with the visual and keep the prose to a line or two of intent.`,
     })
   }
 }
@@ -195,7 +192,7 @@ function lintWideMermaid(node: MdNode, issues: CheckIssue[]): void {
     issues.push({
       ...at(node),
       severity: 'warn',
-      message: `This left-to-right flowchart has ${edges} edges and will shrink to illegibility inline. Use \`flowchart TD\` or split it into smaller diagrams.`,
+      message: `This left-to-right flowchart has ${edges} edges (limit ${WIDE_MERMAID_EDGES}) and will shrink to illegibility inline. Use \`flowchart TD\` or split it into smaller diagrams.`,
     })
   }
 }
@@ -218,7 +215,7 @@ function lintMatrixCells(node: MdNode, issues: CheckIssue[]): void {
     issues.push({
       ...at(node),
       severity: 'warn',
-      message: `A Matrix cell is too long ("${truncate(longest)}", ${longest.length} chars). Cells do not wrap and force a horizontal scrollbar; keep them to a word or short score and put rationale in prose.`,
+      message: `A Matrix cell is too long ("${truncate(longest)}", ${longest.length} chars, limit ${MATRIX_CELL_BUDGET}). Cells do not wrap and force a horizontal scrollbar; keep them to a word or short score and put rationale in prose.`,
     })
   }
 }
@@ -264,7 +261,7 @@ function lintChartMagnitude(node: MdNode, issues: CheckIssue[]): void {
     issues.push({
       ...at(node),
       severity: 'warn',
-      message: `This chart's series differ wildly in scale (a series peaking at ${min} alongside one at ${max}); the small series flattens onto the shared axis. Split into separate charts or normalize to one unit.`,
+      message: `This chart's series differ wildly in scale (a series peaking at ${min} alongside one at ${max}, over ${CHART_MAGNITUDE_RATIO}x apart); the small series flattens onto the shared axis. Split into separate charts or normalize to one unit.`,
     })
   }
 }

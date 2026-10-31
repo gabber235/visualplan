@@ -42,12 +42,21 @@ const mdxCompileOptions: CompileOptions = {
 const require = createRequire(import.meta.url)
 
 /** A plan to render: either MDX source in memory (the programmatic API) or a file to read. */
-type PlanInput = string | { path: string }
+/** A plan folder under --watch: `current` is its last assembled source, `refresh` reassembles it
+ * after a file in the folder changes. */
+interface FolderInput {
+  folder: string
+  current: () => string
+  refresh: () => Promise<void>
+}
+
+type PlanInput = string | { path: string } | FolderInput
 
 /** Read the plan's current source, BOM-stripped; for a `{ path }` input it re-reads each call so a
  * watched plan reflects its latest saved state. */
 function sourceReader(input: PlanInput): () => string {
   if (typeof input === 'string') return () => input
+  if ('folder' in input) return input.current
   const { path } = input
   return () => readFileSync(path, 'utf8').replace(/^\ufeff/, '')
 }
@@ -58,7 +67,7 @@ function sourceReader(input: PlanInput): () => string {
  * reader above: the diff baseline is raw source, and a title never lives inside an SVG. */
 function inlinedSourceReader(input: PlanInput): () => Promise<string> {
   const raw = sourceReader(input)
-  if (typeof input === 'string') return async () => raw()
+  if (typeof input === 'string' || 'folder' in input) return async () => raw()
   const base = dirname(resolve(input.path))
   return async () => (await inlineSvgIncludes(raw(), base)).source
 }
@@ -107,12 +116,21 @@ const RESOLVED_VIRTUAL_PLAN_ID = '\0virtual:plan'
  */
 function virtualPlanPlugin(input: PlanInput): Plugin {
   const readSource = inlinedSourceReader(input)
-  const watchPath = typeof input === 'string' ? null : resolve(input.path)
+  const watchPath = typeof input === 'string' || 'folder' in input ? null : resolve(input.path)
+  const folder = typeof input !== 'string' && 'folder' in input ? input : null
+  // A folder is watched whole, except the plan.html a render writes into it.
+  const inFolder = (file: string) =>
+    folder !== null &&
+    resolve(file).startsWith(`${folder.folder}/`) &&
+    resolve(file) !== join(folder.folder, 'plan.html')
   return {
     name: 'visualplan:virtual-plan',
     enforce: 'pre',
     resolveId(id) {
       if (id === VIRTUAL_PLAN_ID) return RESOLVED_VIRTUAL_PLAN_ID
+    },
+    configureServer(server) {
+      if (folder) server.watcher.add(folder.folder)
     },
     async load(id) {
       if (id !== RESOLVED_VIRTUAL_PLAN_ID) return null
@@ -125,8 +143,9 @@ function virtualPlanPlugin(input: PlanInput): Plugin {
     // trigger invalidation, verified). On a change to the watched plan, invalidate the virtual
     // module and trigger a full reload so --watch reflects the edit. MDX has no HMR boundary, so a
     // full reload is the right granularity.
-    handleHotUpdate(ctx) {
-      if (!watchPath || resolve(ctx.file) !== watchPath) return
+    async handleHotUpdate(ctx) {
+      if (inFolder(ctx.file)) await folder?.refresh()
+      else if (!watchPath || resolve(ctx.file) !== watchPath) return
       const mod = ctx.server.moduleGraph.getModuleById(RESOLVED_VIRTUAL_PLAN_ID)
       // Invalidate the compiled module if it has been loaded, then always reload: the reload must
       // fire even before the browser has loaded virtual:plan (e.g. the very first edit), so it is
@@ -371,7 +390,12 @@ function baseConfig(paths: RuntimePaths, input: PlanInput, options: BuildOptions
     htmlTitlePlugin(readSource),
     planConfigPlugin(theme, lockTheme),
   ]
-  const sourcePath = typeof input === 'string' ? options.sourcePath : resolve(input.path)
+  const sourcePath =
+    typeof input === 'string'
+      ? options.sourcePath
+      : 'folder' in input
+        ? input.folder
+        : resolve(input.path)
   if (sourcePath) plugins.push(planSourcePlugin(sourcePath))
   // The share button renders only when its data is injected, so omitting the plugin hides it.
   if (enableSharing) plugins.push(planSharePlugin(readSource))
@@ -453,16 +477,30 @@ export interface DevServer {
 export const DEFAULT_DEV_PORT = 9140
 
 /** Start a hot-reloading dev server for an MDX plan file and return its local URL. `enableSharing`
- * mirrors `BuildOptions.enableSharing` (omitted = the CLI default, sharing on). */
+ * mirrors `BuildOptions.enableSharing` (omitted = the CLI default, sharing on). A plan folder is
+ * passed as `assemble`, which returns its current assembled source. */
 export async function startDevServer(
-  mdxPath: string,
+  mdxPath: string | { folder: string; assemble: () => Promise<string> },
   theme: Theme = 'system',
   port: number = DEFAULT_DEV_PORT,
   baseline?: string,
   enableSharing?: boolean,
 ): Promise<DevServer> {
   const paths = findRuntimePaths()
-  const config = baseConfig(paths, { path: resolve(mdxPath) }, { theme, baseline, enableSharing })
+  let input: PlanInput = { path: '' }
+  if (typeof mdxPath === 'string') input = { path: resolve(mdxPath) }
+  else {
+    const { assemble } = mdxPath
+    let current = await assemble()
+    input = {
+      folder: resolve(mdxPath.folder),
+      current: () => current,
+      refresh: async () => {
+        current = await assemble()
+      },
+    }
+  }
+  const config = baseConfig(paths, input, { theme, baseline, enableSharing })
   const server = await createServer({ ...config, server: { ...config.server, port } })
   await server.listen()
   const url =

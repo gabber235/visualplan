@@ -179,26 +179,20 @@ function reviewedVision(
 ): WorkspaceModel['vision'] {
   const snapshot = reviews[planReviewId]?.snapshot
   if (!vision || !snapshot || !('problem' in snapshot)) return vision
-  const items = (kind: 'scope' | 'fact') =>
-    Object.entries(snapshot).flatMap(([key, value]) => {
-      const path = key.startsWith('[') ? parseJson(key) : undefined
-      return Array.isArray(path) && path[0] === kind && typeof path[1] === 'string'
-        ? [{ id: path[1], text: value.text }]
-        : []
-    })
+  // Snapshots saved while plans had vision facts also hold fact entries; they are ignored.
+  const scope = Object.entries(snapshot).flatMap(([key, value]) => {
+    const path = key.startsWith('[') ? parseJson(key) : undefined
+    return Array.isArray(path) && path[0] === 'scope' && typeof path[1] === 'string'
+      ? [{ id: path[1], text: value.text }]
+      : []
+  })
   return {
     ...vision,
     problem: recorded(snapshot, 'problem') ?? vision.problem,
     outcome: recorded(snapshot, 'outcome') ?? vision.outcome,
-    scope: items('scope').map(({ id, text }) => {
+    scope: scope.map(({ id, text }) => {
       const out = text.startsWith('Out of scope: ')
       return { id, status: out ? 'out' : 'in', text: text.replace(/^(In|Out of) scope: /, '') }
-    }),
-    facts: items('fact').map(({ id, text }) => {
-      const split = text.lastIndexOf('\nSource: ')
-      return split < 0
-        ? { id, claim: text, source: '' }
-        : { id, claim: text.slice(0, split), source: text.slice(split + 9) }
     }),
   }
 }

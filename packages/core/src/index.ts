@@ -494,21 +494,12 @@ const scopeItemSchema = strictObject({
   status: z.enum(SCOPE_STATUS_VALUES),
 })
 
-/** The confirmed intent of a plan: the problem, the outcome, what is in and out, and its facts. */
+/** The confirmed intent of a plan: the problem, the outcome, its principles, and what is in and out. */
 const planVisionSchema = strictObject({
   problem: z.string().min(1),
   outcome: z.string().min(1),
   principles: z.array(z.string().min(1)).default([]),
   scope: z.array(scopeItemSchema).default([]),
-  facts: z
-    .array(
-      strictObject({
-        id: visionItemIdSchema,
-        claim: z.string().min(1),
-        source: z.string().min(1),
-      }),
-    )
-    .default([]),
 })
 
 export const planWorkspaceSchema = strictObject({
@@ -545,13 +536,12 @@ export const planWorkspaceSchema = strictObject({
 }).superRefine((model, context) => {
   const unique = (values: string[]) => new Set(values).size === values.length
   if (model.vision) {
-    const { scope, facts } = model.vision
-    const visionIds = [...scope, ...facts].map(item => item.id)
+    const visionIds = model.vision.scope.map(item => item.id)
     if (!unique(visionIds)) {
       context.addIssue({
         code: 'custom',
         path: ['vision'],
-        message: 'scope and fact ids must be unique across the vision',
+        message: 'scope ids must be unique across the vision',
       })
     }
   }
@@ -746,7 +736,7 @@ export const stat: CatalogEntry = {
 export const planWorkspace: CatalogEntry = {
   name: 'PlanWorkspace',
   summary:
-    'A vision (problem, outcome, in and out of scope, and facts with sources) that is the confirmed intent, then code models, optional ownership comparisons, reasoning, examples, and edits including pure removals with anchored review. Its single json code block is the canonical model.',
+    'A vision (problem, outcome, and in and out of scope) that is the confirmed intent, then code models, optional ownership comparisons, reasoning, examples, and edits including pure removals with anchored review. Its single json code block is the canonical model. A plan folder (plan.yaml, decisions/<id>.yaml) assembles into it.',
   staticEnums: {},
   example:
     '<PlanWorkspace>\n```json\n{"decisions":[{"id":"ownership","title":"One writer","code":[{"id":"owner","role":"model","file":"editor.ts","symbol":"Editor","language":"typescript","current":"interface Editor { state: MutableState }","proposed":"interface Editor { apply(command: Command): Result }"}]}]}\n```\n</PlanWorkspace>',
@@ -755,7 +745,7 @@ export const planWorkspace: CatalogEntry = {
 export const visual: CatalogEntry = {
   name: 'Visual',
   summary:
-    'A custom explanation inside one PlanWorkspace decision: any MDX content (mermaid, Matrix, Compare, Chart, Svg, tables, short prose) placed after the json block. decision names the decision id, id is stable within it, title heads it. It renders before the code model, takes comments, and its source is part of the decision review.',
+    'A custom explanation inside one PlanWorkspace decision: any MDX content (mermaid, Matrix, Compare, Chart, Svg, tables, short prose) placed after the json block. decision names the decision id, id is stable within it, title heads it. It renders before the code model, takes comments, and its source is part of the decision review. In a plan folder it lives in decisions/<id>.mdx without decision.',
   staticEnums: {},
   example:
     '<Visual decision="ownership" id="write-path" title="Who writes the page">\n```mermaid\nflowchart LR\n  Editor --> Command --> Store\n```\n</Visual>',

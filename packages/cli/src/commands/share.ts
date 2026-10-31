@@ -1,7 +1,6 @@
 import { buildShareUrl } from '@visualplan/core/share'
-import { checkSource } from '../build/check.js'
 import { printIssues } from './check.js'
-import { readPlanSource } from './input.js'
+import { checkPlanSource, readPlanSource } from './input.js'
 
 /**
  * `vplan share [file]` — print a stateless `visualplan.dev/view?data=...` link for a plan, reading
@@ -10,11 +9,12 @@ import { readPlanSource } from './input.js'
  * On issues it prints them to stderr and exits 1 without emitting a URL, keeping stdout clean.
  */
 export async function runShare(file?: string): Promise<void> {
-  const { source, label } = await readPlanSource(file)
+  const plan = await readPlanSource(file)
+  const { source } = plan
 
-  const issues = await checkSource(source)
+  const issues = await checkPlanSource(plan)
   if (issues.length > 0) {
-    printIssues(label, issues)
+    printIssues(issues)
     process.stderr.write(`\n${issues.length} issue(s) found\n`)
     process.exitCode = 1
     return

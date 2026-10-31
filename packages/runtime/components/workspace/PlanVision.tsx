@@ -7,8 +7,8 @@ import { changeKey, visionOwner } from './revision-diff.js'
 import { useWorkspaceReview } from './WorkspaceReview.js'
 
 /**
- * The confirmed intent of the plan: the problem, the outcome, what is in and out of scope, and the
- * facts the plan relies on. Its review mark is the plan approval, so a changed vision reopens it.
+ * The confirmed intent of the plan: the problem, the outcome, and what is in and out of scope. Its
+ * review mark is the plan approval, so a changed vision reopens it.
  */
 export function PlanVision({ model }: { model: WorkspaceModel }) {
   const review = useWorkspaceReview()
@@ -22,7 +22,6 @@ export function PlanVision({ model }: { model: WorkspaceModel }) {
     outcome: model.thesis ?? '',
     principles: [],
     scope: [],
-    facts: [],
   }
   const scope = (status: 'in' | 'out', label: string) => {
     const items = vision.scope.filter(item => item.status === status)
@@ -85,30 +84,6 @@ export function PlanVision({ model }: { model: WorkspaceModel }) {
             </div>
           </section>
         ) : null}
-        {vision.facts.length ? (
-          <section
-            className='vp-workspace__vision-block vp-workspace__facts'
-            aria-label='Relies on'
-          >
-            <span className='vp-workspace__vision-label'>Relies on</span>
-            <ul>
-              {vision.facts.map(fact => (
-                <li
-                  key={fact.id}
-                  {...reviewAnchor(`vision:fact:${fact.id}`, `Relies on: ${fact.claim}`)}
-                  {...changeMark(
-                    revision,
-                    changeKey('vision', 'fact', fact.id),
-                    `${fact.claim}\n${fact.source}`,
-                  )}
-                >
-                  <span>{fact.claim}</span>
-                  <FactSource source={fact.source} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
         {vision.principles.length > 0 ? (
           <ul className='vp-workspace__principles' aria-label='Design principles'>
             {vision.principles.map((principle, index) => (
@@ -125,33 +100,5 @@ export function PlanVision({ model }: { model: WorkspaceModel }) {
       </div>
       {confirm ? <ReviewControls itemId={planReviewId} label='Vision' /> : null}
     </header>
-  )
-}
-
-/** Path segments a shortened source keeps, enough to recognize the file without the full route. */
-const keptSegments = 2
-
-/** Shortens each long path in a source to its tail, so a fact row stays one scannable line. */
-export function shortSource(source: string): string {
-  return source
-    .split(' ')
-    .map(token => {
-      const segments = token.split('/')
-      return segments.length > keptSegments + 1
-        ? `\u2026/${segments.slice(-keptSegments).join('/')}`
-        : token
-    })
-    .join(' ')
-}
-
-/** A fact source in small mono; a shortened path shows in full on hover and to assistive tech. */
-function FactSource({ source }: { source: string }) {
-  const short = shortSource(source)
-  if (short === source) return <cite>{source}</cite>
-  return (
-    <cite title={source}>
-      <span aria-hidden='true'>{short}</span>
-      <span className='vp-workspace__fact-full'>{source}</span>
-    </cite>
   )
 }

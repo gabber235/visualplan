@@ -395,21 +395,10 @@ describe('Plan vision', () => {
   const vision = { problem: 'Services limit differently', outcome: 'One admission policy' }
   const decision = { id: 'D1', title: 'One owner' }
 
-  it('defaults scope and facts so existing plans keep their shape (golden)', () => {
+  it('defaults principles and scope so existing plans keep their shape (golden)', () => {
     const parsed = planWorkspaceSchema.parse({ vision, decisions: [decision] })
-    expect(parsed.vision).toEqual({
-      ...vision,
-      principles: [],
-      scope: [],
-      facts: [],
-    })
-    expect(Object.keys(parsed.vision!)).toEqual([
-      'problem',
-      'outcome',
-      'principles',
-      'scope',
-      'facts',
-    ])
+    expect(parsed.vision).toEqual({ ...vision, principles: [], scope: [] })
+    expect(Object.keys(parsed.vision!)).toEqual(['problem', 'outcome', 'principles', 'scope'])
   })
 
   it('requires at least one decision (error)', () => {
@@ -417,15 +406,14 @@ describe('Plan vision', () => {
     expect(planWorkspaceSchema.safeParse({ thesis: 'Only a thesis' }).success).toBe(false)
   })
 
-  it('rejects duplicate ids across scope and facts (error)', () => {
+  it('rejects duplicate scope ids (error)', () => {
     const result = planWorkspaceSchema.safeParse({
       vision: {
         ...vision,
         scope: [
           { id: 'same', text: 'A', status: 'in' },
-          { id: 'other', text: 'B', status: 'out' },
+          { id: 'same', text: 'B', status: 'out' },
         ],
-        facts: [{ id: 'same', claim: 'C', source: 'D' }],
       },
       decisions: [decision],
     })
@@ -444,8 +432,6 @@ describe('Plan vision', () => {
     expect(parse({ scope: [{ text: 'A', status: 'in' }] })).toBe(false)
     expect(parse({ scope: [{ id: 'a', text: 'A' }] })).toBe(false)
     expect(parse({ scope: [{ id: 'a', text: 'A', status: 'both' }] })).toBe(false)
-    expect(parse({ facts: [{ id: 'f', claim: 'C' }] })).toBe(false)
-    expect(parse({ facts: [{ id: 'f:1', claim: 'C', source: 'S' }] })).toBe(false)
   })
 })
 
@@ -467,6 +453,12 @@ describe('PlanWorkspace unknown keys', () => {
   it.each([
     ['plan', { vision, decisions: [decision], decisons: [] }, '', 'decisons'],
     ['vision', { vision: { ...vision, outcomes: 'x' } }, 'vision', 'outcomes'],
+    [
+      'vision facts',
+      { vision: { ...vision, facts: [{ id: 'f', claim: 'C', source: 'S' }] } },
+      'vision',
+      'facts',
+    ],
     ['decision', { decisions: [{ ...decision, sumary: 'x' }] }, 'decisions.0', 'sumary'],
     [
       'code entry',
