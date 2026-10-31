@@ -145,9 +145,11 @@ describe('content-aware bundling', () => {
     expect(html).toContain('vp-phase')
     expect(html).not.toContain(ELK_MARKER)
     expect(html).not.toContain(RECHARTS_MARKER)
-    // A renderer-free plan is a fraction of the full ~2.3MB bundle; the ceiling catches a regression
-    // to statically bundling elkjs/recharts without flaking on minor dependency size drift.
-    expect(html.length).toBeLessThan(1_000_000)
+    // A renderer-free plan is a fraction of the full bundle; the ceiling catches a regression to
+    // statically bundling elkjs/recharts without flaking on minor dependency size drift. The inlined
+    // fonts (about 6MB) are the same for every plan, so they are left out of the measure.
+    const withoutFonts = html.replace(/url\(data:font\/[^)]*\)/g, '')
+    expect(withoutFonts.length).toBeLessThan(1_000_000)
   }, 60_000)
 
   it('keeps recharts but drops elkjs for a chart-only plan (edge)', async () => {

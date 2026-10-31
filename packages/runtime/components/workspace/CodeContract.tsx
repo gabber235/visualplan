@@ -12,7 +12,7 @@ import { changeKey } from './revision-diff.js'
 interface CodeContractProps {
   decision: WorkspaceDecision
   codeBlocks?: Map<string, ReactNode>
-  role?: 'model' | 'edit'
+  codeRole?: 'model' | 'edit'
 }
 
 /** Side by side columns clip long lines, so wide code reads top to bottom instead. */
@@ -24,10 +24,10 @@ function stacksComparison(contract: WorkspaceDecision['code'][number]): boolean 
   )
 }
 
-export function CodeContract({ decision, codeBlocks, role = 'edit' }: CodeContractProps) {
+export function CodeContract({ decision, codeBlocks, codeRole = 'edit' }: CodeContractProps) {
   const review = useWorkspaceReview()
   const revision = useRevisionChanges()
-  const contracts = decision.code.filter(code => code.role === role)
+  const contracts = decision.code.filter(code => code.role === codeRole)
   const queue = contracts
     .map(change => ({
       change,
@@ -98,18 +98,18 @@ export function CodeContract({ decision, codeBlocks, role = 'edit' }: CodeContra
   return (
     <section
       className='vp-workspace__surface vp-change-review'
-      aria-label={role === 'model' ? 'Model comparison' : 'Code changes'}
+      aria-label={codeRole === 'model' ? 'Model comparison' : 'Code changes'}
       data-status={
-        role === 'model' ? undefined : review.status(reviewGroupId(decision.id, 'changes'))
+        codeRole === 'model' ? undefined : review.status(reviewGroupId(decision.id, 'changes'))
       }
       {...reviewAnchor(
-        role === 'model' ? 'model' : 'changes',
-        role === 'model' ? 'Model comparison' : 'Code changes',
+        codeRole === 'model' ? 'model' : 'changes',
+        codeRole === 'model' ? 'Model comparison' : 'Code changes',
       )}
     >
       <div className='vp-workspace__surface-head'>
         <div>
-          <h3>{role === 'model' ? 'Current and proposed model' : 'Change set'}</h3>
+          <h3>{codeRole === 'model' ? 'Current and proposed model' : 'Change set'}</h3>
           {contracts.length > 1 ? (
             <span className='vp-change-review__count'>
               {contracts.length} {contracts.length === 1 ? 'item' : 'items'}
@@ -117,7 +117,7 @@ export function CodeContract({ decision, codeBlocks, role = 'edit' }: CodeContra
             </span>
           ) : null}
         </div>
-        {role === 'edit' ? (
+        {codeRole === 'edit' ? (
           <ReviewStatusBadge itemId={reviewGroupId(decision.id, 'changes')} />
         ) : null}
       </div>
@@ -125,7 +125,7 @@ export function CodeContract({ decision, codeBlocks, role = 'edit' }: CodeContra
         <div className='vp-change-review__toolbar' ref={toolbar} data-review-ui='true'>
           <nav
             className='vp-code-contract__index'
-            aria-label={role === 'model' ? 'Model comparisons' : 'Change queue'}
+            aria-label={codeRole === 'model' ? 'Model comparisons' : 'Change queue'}
             ref={strip}
           >
             {queue.map(({ change: candidate, summary }) => (

@@ -9,7 +9,7 @@ walls of text. A plan is written as MDX and compiled to a single self-contained 
 
 It comes in two parts that work together:
 
-- **`vplan`** is a CLI that renders a plan `.mdx` file to a single self-contained HTML page.
+- **`vplan`** is a CLI that renders a plan `.mdx` file or plan folder to a single self-contained HTML page.
 - **`visual-plan`** is an agent skill that teaches any AI agent (Claude Code, Cursor, Codex, and
   others) the plan vocabulary, so it writes visual plans instead of prose.
 
@@ -45,6 +45,11 @@ npx vplan plan.mdx
 A plan is a single MDX file: a `# Title`, then normal Markdown mixed with a small set of built-in
 components like `Phase`, `Chart`, `Compare`, and `FileTree`. `vplan` turns it into one polished,
 self-contained page you can open or share.
+
+A design plan can also be a folder: `plan.yaml` holds the title, vision, and decision order, and
+`decisions/<id>.yaml` holds each decision with optional visuals in `decisions/<id>.mdx`. Every
+command takes the folder path in place of a file and writes its outputs (`plan.html`, `plan.pdf`)
+inside it. See `packages/cli/templates/workspace-example/`.
 
 Browse these example plans rendered live in the browser:
 

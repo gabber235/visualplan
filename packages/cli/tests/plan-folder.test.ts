@@ -2,6 +2,8 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { readFile } from 'node:fs/promises'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { checkPlanSource, lintPlanSource, readPlanSource } from '../src/commands/input.js'
 
@@ -164,5 +166,20 @@ describe('plan folders', () => {
 
   it('throws for a folder without plan.yaml (error)', async () => {
     await expect(readPlanSource(join(dir, 'decisions'))).rejects.toThrow(/no plan\.yaml/)
+  })
+})
+
+describe('workspace example folder', () => {
+  const templates = fileURLToPath(new URL('../templates/', import.meta.url))
+  const model = (source: string) =>
+    JSON.parse(source.split('```json\n')[1]?.split('\n```')[0] ?? '')
+
+  it('checks clean and assembles the same workspace as the .mdx example (golden)', async () => {
+    const plan = await readPlanSource(join(templates, 'workspace-example'))
+    expect(await checkPlanSource(plan)).toEqual([])
+    expect(lintPlanSource(plan)).toEqual([])
+    const mdx = await readFile(join(templates, 'workspace-example.mdx'), 'utf8')
+    expect(model(plan.source)).toEqual(model(mdx))
+    expect(plan.source).toContain('<Visual decision="admission" id="admission-path"')
   })
 })

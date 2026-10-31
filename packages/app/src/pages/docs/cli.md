@@ -9,6 +9,23 @@ description: Every vplan command and flag.
 `vplan` is the CLI that renders a plan `.mdx` file to a self-contained HTML page. Install it with
 `npm i -g vplan` (see [Installation](/docs/install/)).
 
+## Plan folders
+
+Every command that takes a plan file also takes a plan folder:
+
+```text
+docs/plans/<slug>/
+  plan.yaml              # title, vision, order: [decision ids]
+  decisions/
+    <id>.yaml            # one PlanWorkspace decision; its id is the file name
+    <id>.mdx             # optional: its <Visual> elements, without a decision attribute
+```
+
+`vplan` assembles the folder into one `PlanWorkspace`. `check` reports each error and warning at the
+YAML or MDX file and line that causes it, and a decision file missing from `order` (or an `order` id
+without a file) is an error. Default outputs go inside the folder: `plan.html`, `plan.pdf`,
+`plan.jpg`. `--watch` reloads when any file in the folder changes.
+
 ## render
 
 ```bash
@@ -16,8 +33,8 @@ vplan <file.mdx>
 ```
 
 Opens the plan in an interactive review session by default (see [Review mode](#review-mode)). Pass
-`--static` to instead compile a single self-contained `<file>.plan.html` next to the source and open
-it. `render` is the default command, so `vplan plan.mdx` and `vplan render plan.mdx` are the same.
+`--static` to instead compile a single self-contained `<file>.plan.html` next to the source (or
+`plan.html` inside a plan folder) and open it. `render` is the default command, so `vplan plan.mdx` and `vplan render plan.mdx` are the same.
 The file argument may be `-` (or omitted) to read the plan from stdin.
 
 | Flag | Effect |
@@ -63,7 +80,7 @@ without touching the cache, or `--no-diff` to opt out (for example a clean first
 ## check
 
 ```bash
-vplan check <file.mdx>
+vplan check <file.mdx | folder>
 ```
 
 Validates a plan without rendering it, the self-correction loop. It reports MDX compile errors
@@ -89,7 +106,7 @@ vplan export <pdf|jpg> <file.mdx>
 
 Builds the same self-contained page, then renders it to a static file with a headless Chromium:
 `pdf` prints a paginated A4 document, `jpg` a full-page hi-dpi screenshot. The output goes to
-`<file>.pdf` / `<file>.jpg` next to the source and opens. See [Exporting](/docs/export/) for when to
+`<file>.pdf` / `<file>.jpg` next to the source (or `plan.pdf` / `plan.jpg` inside a plan folder) and opens. See [Exporting](/docs/export/) for when to
 reach for it over the HTML page.
 
 | Flag | Effect |

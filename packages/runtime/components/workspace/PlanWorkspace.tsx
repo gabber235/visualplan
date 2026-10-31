@@ -126,7 +126,7 @@ function WorkspaceContent({ model, children }: { model: WorkspaceModel; children
               key={`${decision.id}:model`}
               decision={decision}
               codeBlocks={codeSlots.blocks}
-              role='model'
+              codeRole='model'
             />
           </DecisionWorkbench>
           <DeveloperExperience decision={decision} codeBlocks={codeSlots.blocks} />
